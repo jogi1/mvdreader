@@ -40,8 +40,8 @@ func (mvd *Mvd) messageParse(message Message) error {
 		}
 		msg_type := SVC_TYPE(msgt)
 
-		if mvd.Debug != nil {
-			mvd.Debug.Println("handling: ", msg_type)
+		if mvd.debug != nil {
+			mvd.debug.Println("handling: ", msg_type)
 		}
 		m := reflect.ValueOf(&message).MethodByName(strings.Title(fmt.Sprintf("%s", msg_type)))
 
@@ -70,15 +70,15 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 		if err != nil {
 			return err
 		}
-		message.mvd.Demo.protocol = PROTOCOL_VERSION(prot)
-		protocol := message.mvd.Demo.protocol
+		message.mvd.demo.protocol = PROTOCOL_VERSION(prot)
+		protocol := message.mvd.demo.protocol
 
 		if protocol == protocol_fte2 {
 			err, fte_pext2 := message.readLong()
 			if err != nil {
 				return err
 			}
-			message.mvd.Demo.fte_pext2 = FTE_PROTOCOL_EXTENSION(fte_pext2)
+			message.mvd.demo.fte_pext2 = FTE_PROTOCOL_EXTENSION(fte_pext2)
 			continue
 		}
 
@@ -88,7 +88,7 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 			if err != nil {
 				return err
 			}
-			message.mvd.Demo.fte_pext = FTE_PROTOCOL_EXTENSION(fte_pext)
+			message.mvd.demo.fte_pext = FTE_PROTOCOL_EXTENSION(fte_pext)
 			continue
 		}
 
@@ -98,7 +98,7 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 			if err != nil {
 				return err
 			}
-			message.mvd.Demo.mvd_pext = MVD_PROTOCOL_EXTENSION(mvd_pext)
+			message.mvd.demo.mvd_pext = MVD_PROTOCOL_EXTENSION(mvd_pext)
 			continue
 		}
 		if protocol == protocol_standard {
@@ -171,7 +171,7 @@ func (message *Message) Svc_soundlist(mvd *Mvd) error {
 		if err != nil {
 			return err
 		}
-		message.mvd.Demo.Soundlist = append(message.mvd.Demo.Soundlist, s)
+		message.mvd.Server.Soundlist = append(message.mvd.Server.Soundlist, s)
 		if len(s) == 0 {
 			break
 		}
@@ -193,7 +193,7 @@ func (message *Message) Svc_modellist(mvd *Mvd) error {
 		if err != nil {
 			return err
 		}
-		message.mvd.Demo.Modellist = append(message.mvd.Demo.Modellist, s)
+		message.mvd.Server.Modellist = append(message.mvd.Server.Modellist, s)
 		if len(s) == 0 {
 			break
 		}
@@ -598,7 +598,7 @@ func (message *Message) Svc_updatestatlong(mvd *Mvd) error {
 	if err != nil {
 		return err
 	}
-	p := &mvd.State.Players[mvd.Demo.last_to]
+	p := &mvd.State.Players[mvd.demo.last_to]
 	s := fmt.Sprintf("%s", STAT_TYPE(stat))
 	s = strings.TrimPrefix(s, "STAT_")
 	s = strings.ToLower(s)
@@ -613,7 +613,7 @@ func (message *Message) Svc_updatestatlong(mvd *Mvd) error {
 			}
 		}
 	}
-	mvd.emitEventPlayer(p, byte(mvd.Demo.last_to), PE_STATS)
+	mvd.emitEventPlayer(p, byte(mvd.demo.last_to), PE_STATS)
 	return nil
 }
 
@@ -627,7 +627,7 @@ func (message *Message) Svc_updatestat(mvd *Mvd) error {
 	if err != nil {
 		return err
 	}
-	p := &mvd.State.Players[mvd.Demo.last_to]
+	p := &mvd.State.Players[mvd.demo.last_to]
 	s := fmt.Sprintf("%s", STAT_TYPE(stat))
 	s = strings.TrimPrefix(s, "STAT_")
 	s = strings.ToLower(s)
@@ -644,7 +644,7 @@ func (message *Message) Svc_updatestat(mvd *Mvd) error {
 	} else {
 		return errors.New(fmt.Sprintf("unknown STAT_ type: %s\n", stat))
 	}
-	mvd.emitEventPlayer(p, byte(mvd.Demo.last_to), PE_STATS)
+	mvd.emitEventPlayer(p, byte(mvd.demo.last_to), PE_STATS)
 	return nil
 }
 
@@ -1127,7 +1127,7 @@ func (message *Message) readString() (error, string) {
 }
 
 func (message *Message) readCoord() (error, float32) {
-	if message.mvd.Demo.fte_pext&FTE_PEXT_FLOATCOORDS == FTE_PEXT_FLOATCOORDS {
+	if message.mvd.demo.fte_pext&FTE_PEXT_FLOATCOORDS == FTE_PEXT_FLOATCOORDS {
 		err, f := message.readFloat()
 		if err != nil {
 			return err, 0
@@ -1142,7 +1142,7 @@ func (message *Message) readCoord() (error, float32) {
 }
 
 func (message *Message) readAngle() (error, float32) {
-	if message.mvd.Demo.fte_pext&FTE_PEXT_FLOATCOORDS == FTE_PEXT_FLOATCOORDS {
+	if message.mvd.demo.fte_pext&FTE_PEXT_FLOATCOORDS == FTE_PEXT_FLOATCOORDS {
 
 		err, a := message.readAngle16()
 		if err != nil {

@@ -7,12 +7,10 @@ import (
 )
 
 type Demo struct {
-	Time                                 float64
+	time                                 float64
 	last_to                              uint
 	last_type                            DEM_TYPE
 	outgoing_sequence, incoming_sequence uint32
-	Soundlist                            []string
-	Modellist                            []string
 	protocol                             PROTOCOL_VERSION
 	fte_pext                             FTE_PROTOCOL_EXTENSION
 	fte_pext2                            FTE_PROTOCOL_EXTENSION
@@ -112,10 +110,12 @@ type Server struct {
 	Hostname    string
 	Movevars    []float32
 	Serverinfo  map[string]string
+	Soundlist   []string
+	Modellist   []string
 }
 
 type Mvd struct {
-	Debug *log.Logger
+	debug *log.Logger
 
 	file        []byte
 	file_offset uint
@@ -124,14 +124,15 @@ type Mvd struct {
 	Frame       uint
 	done        bool
 
-	Demo             Demo
+	demo             Demo
 	Server           Server
 	State            MvdState
 	State_last_frame MvdState
 }
 
-func Load(input []byte) (error, Mvd) {
+func Load(input []byte, logger *log.Logger) (error, Mvd) {
 	var mvd Mvd
+	mvd.debug = logger
 	mvd.file = input
 	mvd.file_length = uint(len(input))
 	mvd.Server.Serverinfo = make(map[string]string, 0)
@@ -152,8 +153,8 @@ func (mvd *Mvd) Parse() error {
 }
 
 func (mvd *Mvd) ParseFrame() (error, bool) {
-	if mvd.Debug != nil {
-		mvd.Debug.Printf("Frame (%v)", mvd.Frame)
+	if mvd.debug != nil {
+		mvd.debug.Printf("Frame (%v)", mvd.Frame)
 	}
 	mvd.State_last_frame = MvdState(mvd.State)
 	mvd.State_last_frame.Serverinfo = mvd.State.Serverinfo
@@ -184,7 +185,7 @@ func (mvd *Mvd) ParseFrame() (error, bool) {
 func (mvd *Mvd) readFrame() error {
 	for {
 		mvd.demotime()
-		mvd.State.Time = mvd.Demo.Time
+		mvd.State.Time = mvd.demo.time
 		err, cmd := mvd.readByte()
 		if err != nil {
 			return err
@@ -194,8 +195,8 @@ func (mvd *Mvd) readFrame() error {
 			return errors.New("this is an mvd parser")
 		}
 
-		if mvd.Debug != nil {
-			mvd.Debug.Println("handling cmd", DEM_TYPE(cmd))
+		if mvd.debug != nil {
+			mvd.debug.Println("handling cmd", DEM_TYPE(cmd))
 		}
 		if msg_type >= dem_multiple && msg_type <= dem_all {
 			switch msg_type {
@@ -205,59 +206,59 @@ func (mvd *Mvd) readFrame() error {
 					if err != nil {
 						return err
 					}
-					mvd.Demo.last_to = uint(i)
-					if mvd.Debug != nil {
-						mvd.Debug.Println("affected players: ", strconv.FormatInt(int64(mvd.Demo.last_to), 2), mvd.Demo.last_to)
+					mvd.demo.last_to = uint(i)
+					if mvd.debug != nil {
+						mvd.debug.Println("affected players: ", strconv.FormatInt(int64(mvd.demo.last_to), 2), mvd.demo.last_to)
 					}
-					mvd.Demo.last_type = dem_multiple
+					mvd.demo.last_type = dem_multiple
 					break
 				}
 			case dem_single:
 				{
-					mvd.Demo.last_to = uint(cmd >> 3)
-					mvd.Demo.last_type = dem_single
+					mvd.demo.last_to = uint(cmd >> 3)
+					mvd.demo.last_type = dem_single
 					break
 				}
 			case dem_all:
 				{
-					if mvd.Debug != nil {
-						mvd.Debug.Println("dem_all", mvd.file_offset)
+					if mvd.debug != nil {
+						mvd.debug.Println("dem_all", mvd.file_offset)
 					}
-					mvd.Demo.last_to = 0
-					mvd.Demo.last_type = dem_all
+					mvd.demo.last_to = 0
+					mvd.demo.last_type = dem_all
 					break
 				}
 
 			case dem_stats:
 				{
-					if mvd.Debug != nil {
-						mvd.Debug.Println("dem_all", mvd.file_offset)
-						mvd.Debug.Println("dem_stats", cmd, cmd&7, dem_stats, mvd.file_offset, "byte: ", mvd.file[mvd.file_offset])
+					if mvd.debug != nil {
+						mvd.debug.Println("dem_all", mvd.file_offset)
+						mvd.debug.Println("dem_stats", cmd, cmd&7, dem_stats, mvd.file_offset, "byte: ", mvd.file[mvd.file_offset])
 					}
-					mvd.Demo.last_to = uint(cmd >> 3)
-					mvd.Demo.last_type = dem_stats
+					mvd.demo.last_to = uint(cmd >> 3)
+					mvd.demo.last_type = dem_stats
 					break
 				}
 			}
 			msg_type = dem_read
 		}
 		if msg_type == dem_set {
-			if mvd.Debug != nil {
-				mvd.Debug.Println("dem_set", mvd.file_offset)
+			if mvd.debug != nil {
+				mvd.debug.Println("dem_set", mvd.file_offset)
 			}
 			err, outgoing_sequence := mvd.readUint()
 			if err != nil {
 				return err
 			}
-			mvd.Demo.outgoing_sequence = outgoing_sequence
+			mvd.demo.outgoing_sequence = outgoing_sequence
 
 			err, incoming_sequence := mvd.readUint()
 			if err != nil {
 				return err
 			}
-			mvd.Demo.incoming_sequence = incoming_sequence
-			if mvd.Debug != nil {
-				mvd.Debug.Printf("Squence in(%v) out(%v)", mvd.Demo.incoming_sequence, mvd.Demo.outgoing_sequence)
+			mvd.demo.incoming_sequence = incoming_sequence
+			if mvd.debug != nil {
+				mvd.debug.Printf("Squence in(%v) out(%v)", mvd.demo.incoming_sequence, mvd.demo.outgoing_sequence)
 			}
 			continue
 		}
@@ -267,8 +268,8 @@ func (mvd *Mvd) readFrame() error {
 				return err
 			}
 			for b == true {
-				if mvd.Debug != nil {
-					mvd.Debug.Println("did we loop?")
+				if mvd.debug != nil {
+					mvd.debug.Println("did we loop?")
 				}
 				err, b = mvd.readIt(msg_type)
 				if err != nil {
@@ -277,8 +278,8 @@ func (mvd *Mvd) readFrame() error {
 			}
 			return nil
 		}
-		if mvd.Debug != nil {
-			mvd.Debug.Println(cmd)
+		if mvd.debug != nil {
+			mvd.debug.Println(cmd)
 		}
 		return errors.New("this should not happen")
 	}
