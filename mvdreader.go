@@ -164,14 +164,20 @@ func (mvd *Mvd) ParseFrame() (error, bool) {
 		mvd.State.Players[i].Setinfo = make(map[string]string)
 	}
 
-	err := mvd.readFrame()
-	if err != nil {
-		if mvd.done {
-			return nil, mvd.done
+	for {
+		err := mvd.readFrame()
+		if err != nil {
+			if mvd.done {
+				return nil, mvd.done
+			}
+			return err, false
 		}
-		return err, false
+		mvd.Frame++
+		err, readahead_time := mvd.demotimeReadahead()
+		if readahead_time != 0 {
+			break
+		}
 	}
-	mvd.Frame++
 	return nil, mvd.done
 }
 

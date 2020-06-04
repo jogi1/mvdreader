@@ -6,6 +6,14 @@ import (
 	"errors"
 )
 
+func (mvd *Mvd) demotimeReadahead() (error, float64) {
+	err, b := mvd.readByteAhead()
+	if err != nil {
+		return err, 0
+	}
+	return nil, float64(b)
+}
+
 func (mvd *Mvd) demotime() error {
 	err, b := mvd.readByte()
 	if err != nil {
@@ -32,6 +40,14 @@ func (mvd *Mvd) readBytes(count uint) (error, *bytes.Buffer) {
 
 func (mvd *Mvd) getInfo(a ...interface{}) string {
 	return ""
+}
+
+func (mvd *Mvd) readByteAhead() (error, byte) {
+	if mvd.file_offset+1 > mvd.file_length {
+		return errors.New("readByteAhead: trying to read beyond"), byte(0)
+	}
+	b := mvd.file[mvd.file_offset]
+	return nil, b
 }
 
 func (mvd *Mvd) readByte() (error, byte) {
