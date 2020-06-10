@@ -93,25 +93,48 @@ type ServerMessage struct {
 	Message string
 }
 
-type MvdState struct {
+type State struct {
 	Time         float64
 	Players      [32]Player
 	SoundsActive []Sound
 	SoundsStatic []Sound
 	Serverinfo   []Serverinfo
 	Messages     []ServerMessage
+	Centerprint  []string
+	TempEntities []Tempentity
+}
+
+type Entity struct {
+	ModelIndex    int
+	SkinNum       int
+	Frame         int
+	ColorMap      int
+	Origin, Angle Vector
+}
+
+type Tempentity struct {
+	ModelIndex int
+	SkinNum    int
+	Frame      int
+	ColorMap   int
+	Origin     Vector
+	Start      Vector // beams
+	Entity     int    // beams?
+	Count      int    // gunshot, blood
 }
 
 type Server struct {
-	ServerCount int
-	Gamedir     string
-	Demotime    float32
-	Mapname     string
-	Hostname    string
-	Movevars    []float32
-	Serverinfo  map[string]string
-	Soundlist   []string
-	Modellist   []string
+	ServerCount    int
+	Gamedir        string
+	Demotime       float32
+	Mapname        string
+	Hostname       string
+	Movevars       []float32
+	Serverinfo     map[string]string
+	Soundlist      []string
+	Modellist      []string
+	Baseline       []Entity
+	StaticEntities []Entity
 }
 
 type Mvd struct {
@@ -123,11 +146,12 @@ type Mvd struct {
 	filename    string
 	Frame       uint
 	done        bool
+	trace       traceInfo
 
 	demo             Demo
 	Server           Server
-	State            MvdState
-	State_last_frame MvdState
+	State            State
+	State_last_frame State
 }
 
 func Load(input []byte, logger *log.Logger) (error, Mvd) {
@@ -136,6 +160,7 @@ func Load(input []byte, logger *log.Logger) (error, Mvd) {
 	mvd.file = input
 	mvd.file_length = uint(len(input))
 	mvd.Server.Serverinfo = make(map[string]string, 0)
+	mvd.trace.enabled = false
 	return nil, mvd
 }
 
@@ -152,11 +177,19 @@ func (mvd *Mvd) Parse() error {
 	return nil
 }
 
+func (mvd *Mvd) TraceEnable() {
+	mvd.trace.enabled = true
+}
+
+func (mvd *Mvd) TraceGet() []*TraceParseFrame {
+	return mvd.trace.traces
+}
+
 func (mvd *Mvd) ParseFrame() (error, bool) {
 	if mvd.debug != nil {
 		mvd.debug.Printf("Frame (%v)", mvd.Frame)
 	}
-	mvd.State_last_frame = MvdState(mvd.State)
+	mvd.State_last_frame = State(mvd.State)
 	mvd.State_last_frame.Serverinfo = mvd.State.Serverinfo
 	mvd.State.Serverinfo = nil
 	mvd.State_last_frame.Messages = mvd.State.Messages
@@ -165,32 +198,44 @@ func (mvd *Mvd) ParseFrame() (error, bool) {
 		mvd.State.Players[i].Setinfo = make(map[string]string)
 	}
 
+	mvd.traceParseFrameStart()
+
 	for {
 		err := mvd.readFrame()
 		if err != nil {
 			if mvd.done {
+				mvd.traceParseFrameStop()
 				return nil, mvd.done
 			}
 			return err, false
 		}
 		mvd.Frame++
 		err, readahead_time := mvd.demotimeReadahead()
+
 		if readahead_time != 0 {
 			break
 		}
 	}
+
+	mvd.traceParseFrameStop()
 	return nil, mvd.done
 }
 
 func (mvd *Mvd) readFrame() error {
 	for {
+		mvd.traceReadFrameStart()
 		mvd.demotime()
 		mvd.State.Time = mvd.demo.time
+
+		rt := mvd.traceAddReadTrace("cmd")
 		err, cmd := mvd.readByte()
 		if err != nil {
 			return err
 		}
 		msg_type := DEM_TYPE(cmd & 7)
+		if rt != nil {
+			rt.addAdditionalInfo("mvd_type", msg_type)
+		}
 		if msg_type == dem_cmd {
 			return errors.New("this is an mvd parser")
 		}
@@ -202,11 +247,15 @@ func (mvd *Mvd) readFrame() error {
 			switch msg_type {
 			case dem_multiple:
 				{
+					rt := mvd.traceAddReadTrace("dem_multiple")
 					err, i := mvd.readInt()
 					if err != nil {
 						return err
 					}
 					mvd.demo.last_to = uint(i)
+					if rt != nil {
+						rt.addAdditionalInfo("last_to", uint(i))
+					}
 					if mvd.debug != nil {
 						mvd.debug.Println("affected players: ", strconv.FormatInt(int64(mvd.demo.last_to), 2), mvd.demo.last_to)
 					}
@@ -235,6 +284,9 @@ func (mvd *Mvd) readFrame() error {
 						mvd.debug.Println("dem_all", mvd.file_offset)
 						mvd.debug.Println("dem_stats", cmd, cmd&7, dem_stats, mvd.file_offset, "byte: ", mvd.file[mvd.file_offset])
 					}
+					if rt != nil {
+						rt.addAdditionalInfo("last_to", uint(cmd>>3))
+					}
 					mvd.demo.last_to = uint(cmd >> 3)
 					mvd.demo.last_type = dem_stats
 					break
@@ -246,20 +298,32 @@ func (mvd *Mvd) readFrame() error {
 			if mvd.debug != nil {
 				mvd.debug.Println("dem_set", mvd.file_offset)
 			}
+
+			rt := mvd.traceAddReadTrace("outgoing_sequence")
 			err, outgoing_sequence := mvd.readUint()
 			if err != nil {
 				return err
 			}
+
+			if rt != nil {
+				rt.addAdditionalInfo("outgoing_sequence", outgoing_sequence)
+			}
 			mvd.demo.outgoing_sequence = outgoing_sequence
 
+			rt = mvd.traceAddReadTrace("incoming_sequence")
 			err, incoming_sequence := mvd.readUint()
 			if err != nil {
 				return err
+			}
+
+			if rt != nil {
+				rt.addAdditionalInfo("incoming_sequence", incoming_sequence)
 			}
 			mvd.demo.incoming_sequence = incoming_sequence
 			if mvd.debug != nil {
 				mvd.debug.Printf("Squence in(%v) out(%v)", mvd.demo.incoming_sequence, mvd.demo.outgoing_sequence)
 			}
+			mvd.traceReadFrameStop()
 			continue
 		}
 		if msg_type == dem_read {
@@ -276,11 +340,14 @@ func (mvd *Mvd) readFrame() error {
 					return err
 				}
 			}
+			mvd.traceReadFrameStop()
 			return nil
 		}
 		if mvd.debug != nil {
 			mvd.debug.Println(cmd)
 		}
+
+		mvd.traceReadFrameStop()
 		return errors.New("this should not happen")
 	}
 
