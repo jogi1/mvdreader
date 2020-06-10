@@ -48,15 +48,6 @@ func (mvd *Mvd) traceReadFrameStop() {
 	cTrace.FileOffsetStop = mvd.file_offset
 }
 
-func (mvd *Mvd) traceAddReadTrace(identifier string) *TraceRead {
-	if mvd.trace.enabled == false {
-		return nil
-	}
-	c := mvd.trace.currentReadTraceReciever.addReadTrace(identifier)
-	mvd.trace.currentReadTrace = c
-	return c
-}
-
 func (mvd *Mvd) traceGetCurrentReadTrace() *TraceRead {
 	if mvd.trace.enabled == false {
 		return nil
@@ -82,7 +73,7 @@ type TraceRead struct {
 }
 
 type TraceMessageTrace struct {
-	Message     Message
+	Message     *Message
 	Type        SVC_TYPE
 	Reads       []*TraceRead
 	MessageData []byte
@@ -111,38 +102,66 @@ func (mvd *Mvd) getReadItTrace() *TraceReadIt {
 	return mvd.trace.current.currentReadFrameTrace.currentReadIt
 }
 
-func (mvd *Mvd) getCurrentMessageTrace() *TraceMessageTrace {
+func (mvd *Mvd) traceGetCurrentMessageTrace() *TraceMessageTrace {
 	if mvd.trace.enabled == false {
 		return nil
 	}
-
-	return mvd.trace.current.currentReadFrameTrace.currentReadIt.currentMessageTrace
+	crt := mvd.getReadItTrace()
+	if crt == nil {
+		return nil
+	}
+	return crt.currentMessageTrace
 }
-func (mvd *Mvd) getCurrentMessageTraceReadTrace() *TraceRead {
+
+func (mvd *Mvd) traceGetCurrentMessageTraceReadTrace() *TraceRead {
 	if mvd.trace.enabled == false {
 		return nil
 	}
-	c := mvd.trace.current
-	// this is stupid
-	if c != nil {
-		//return mvd.trace.current.currentReadFrameTrace.currentReadIt.currentMessageTrace.currentRead
-		cc := c.currentReadFrameTrace
-		if cc != nil {
-			ccc := cc.currentReadIt
-			if ccc != nil {
-				cccc := ccc.currentMessageTrace
-				if cccc != nil {
-					if cccc.currentRead != nil {
-						return cccc.currentRead
-					}
-				}
-			}
-		}
+	cmt := mvd.traceGetCurrentMessageTrace()
+	if cmt != nil {
+		return cmt.currentRead
 	}
 	return nil
 }
 
-func (tri *TraceReadIt) addMessageTrace(message Message) *TraceMessageTrace {
+func (message *Message) traceAddMessageReadTrace(info string) {
+	if message.mvd.trace.enabled == false {
+		return
+	}
+
+	mt := message.mvd.traceGetCurrentMessageTraceReadTrace()
+	mt.Info = info
+}
+
+func (message *Message) traceStartMessageReadTrace(identifier string, offsetStart, offsetStop *uint, value interface{}) {
+	if message.mvd.trace.enabled == false {
+		return
+	}
+	rt := message.mvd.traceGetCurrentMessageTraceReadTrace()
+	if rt == nil {
+		return
+	}
+	if len(rt.Identifier) == 0 {
+		rt.Identifier = identifier
+	} else {
+		if rt.Identifier != identifier {
+			return
+		}
+	}
+	if offsetStart != nil {
+		rt.OffsetStart = *offsetStart
+	}
+
+	if offsetStop != nil {
+		rt.OffsetStop = *offsetStop
+	}
+
+	if value != nil {
+		rt.Value = value
+	}
+}
+
+func (tri *TraceReadIt) addMessageTrace(message *Message) *TraceMessageTrace {
 	mt := new(TraceMessageTrace)
 	mt.Message = message
 	mt.MessageData = message.data
@@ -173,13 +192,22 @@ type TraceReadFrame struct {
 	Reads                           []*TraceRead
 }
 
-func (mvd *Mvd) startReadItTrace() *TraceReadIt {
+func (mvd *Mvd) traceStartReadItTrace() {
+	if mvd.trace.enabled == false {
+		return
+	}
 	tri := new(TraceReadIt)
 	trf := mvd.trace.current.currentReadFrameTrace
 	trf.currentReadIt = tri
 	trf.ReadItTraces = append(trf.ReadItTraces, tri)
 	mvd.trace.currentReadTraceReciever = tri
-	return tri
+}
+
+func (mvd *Mvd) traceReadItTraceCurrentSize(current_size int) {
+	if mvd.trace.enabled == false {
+		return
+	}
+	mvd.trace.current.currentReadFrameTrace.currentReadIt.CurrentSize = current_size
 }
 
 func (trace *TraceReadFrame) addReadTrace(info string) *TraceRead {
@@ -192,6 +220,85 @@ func (trace *TraceReadFrame) addReadTrace(info string) *TraceRead {
 func (read *TraceRead) addAdditionalInfo(info string, value interface{}) {
 	ai := AdditionalInfo{info, value}
 	read.AdditionalInfo = append(read.AdditionalInfo, ai)
+}
+
+func (mvd *Mvd) traceAddReadTrace(identifier string) {
+	if mvd.trace.enabled == false {
+		return
+	}
+	mvd.trace.currentReadTrace = mvd.trace.currentReadTraceReciever.addReadTrace(identifier)
+}
+
+func (mvd *Mvd) traceReadTraceAdditionalInfo(info string, value interface{}) {
+	if mvd.trace.enabled == false {
+		return
+	}
+	ai := AdditionalInfo{info, value}
+	mvd.trace.currentReadTrace.AdditionalInfo = append(mvd.trace.currentReadTrace.AdditionalInfo, ai)
+}
+
+func (mvd *Mvd) traceStartReadTrace(identifier string, offsetStart, offsetStop *uint, value interface{}) {
+	if mvd.trace.enabled == false {
+		return
+	}
+	rt := mvd.traceGetCurrentReadTrace()
+	if rt == nil {
+		return
+	}
+	if len(rt.Identifier) == 0 {
+		rt.Identifier = identifier
+	} else {
+		if rt.Identifier != identifier {
+			return
+		}
+	}
+	if offsetStart != nil {
+		rt.OffsetStart = *offsetStart
+	}
+
+	if offsetStop != nil {
+		rt.OffsetStop = *offsetStop
+	}
+
+	if value != nil {
+		rt.Value = value
+	}
+}
+
+func (mvd *Mvd) traceStartMessageTrace(message *Message) {
+	if mvd.trace.enabled == false {
+		return
+	}
+	rit := mvd.getReadItTrace()
+	rit.currentMessageTrace = rit.addMessageTrace(message)
+}
+
+func (mvd *Mvd) traceMessageInfo(msgType SVC_TYPE) {
+	if mvd.trace.enabled == false {
+		return
+	}
+	rit := mvd.getReadItTrace()
+	cmt := rit.currentMessageTrace
+	cmt.Type = msgType
+}
+
+func (mvd *Mvd) traceStartMessageTraceReadTrace(info string) {
+	if mvd.trace.enabled == false {
+		return
+	}
+	rit := mvd.getReadItTrace()
+	rit.currentMessageTrace.addReadTrace(info)
+}
+
+func (message *Message) traceMessageReadAdditionlInfo(info string, value interface{}) {
+	if message.mvd.trace.enabled == false {
+		return
+	}
+	rit := message.mvd.traceGetCurrentMessageTraceReadTrace()
+	if rit == nil {
+		return
+	}
+	rit.addAdditionalInfo(info, value)
 }
 
 // mvd.ParseFrame trace

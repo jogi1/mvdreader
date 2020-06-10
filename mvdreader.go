@@ -227,15 +227,13 @@ func (mvd *Mvd) readFrame() error {
 		mvd.demotime()
 		mvd.State.Time = mvd.demo.time
 
-		rt := mvd.traceAddReadTrace("cmd")
+		mvd.traceAddReadTrace("cmd")
 		err, cmd := mvd.readByte()
 		if err != nil {
 			return err
 		}
 		msg_type := DEM_TYPE(cmd & 7)
-		if rt != nil {
-			rt.addAdditionalInfo("mvd_type", msg_type)
-		}
+		mvd.traceReadTraceAdditionalInfo("mvd_type", msg_type)
 		if msg_type == dem_cmd {
 			return errors.New("this is an mvd parser")
 		}
@@ -247,15 +245,13 @@ func (mvd *Mvd) readFrame() error {
 			switch msg_type {
 			case dem_multiple:
 				{
-					rt := mvd.traceAddReadTrace("dem_multiple")
+					mvd.traceAddReadTrace("dem_multiple")
 					err, i := mvd.readInt()
 					if err != nil {
 						return err
 					}
 					mvd.demo.last_to = uint(i)
-					if rt != nil {
-						rt.addAdditionalInfo("last_to", uint(i))
-					}
+					mvd.traceReadTraceAdditionalInfo("last_to", uint(i))
 					if mvd.debug != nil {
 						mvd.debug.Println("affected players: ", strconv.FormatInt(int64(mvd.demo.last_to), 2), mvd.demo.last_to)
 					}
@@ -284,9 +280,7 @@ func (mvd *Mvd) readFrame() error {
 						mvd.debug.Println("dem_all", mvd.file_offset)
 						mvd.debug.Println("dem_stats", cmd, cmd&7, dem_stats, mvd.file_offset, "byte: ", mvd.file[mvd.file_offset])
 					}
-					if rt != nil {
-						rt.addAdditionalInfo("last_to", uint(cmd>>3))
-					}
+					mvd.traceReadTraceAdditionalInfo("last_to", uint(cmd>>3))
 					mvd.demo.last_to = uint(cmd >> 3)
 					mvd.demo.last_type = dem_stats
 					break
@@ -299,26 +293,22 @@ func (mvd *Mvd) readFrame() error {
 				mvd.debug.Println("dem_set", mvd.file_offset)
 			}
 
-			rt := mvd.traceAddReadTrace("outgoing_sequence")
+			mvd.traceAddReadTrace("outgoing_sequence")
 			err, outgoing_sequence := mvd.readUint()
 			if err != nil {
 				return err
 			}
 
-			if rt != nil {
-				rt.addAdditionalInfo("outgoing_sequence", outgoing_sequence)
-			}
+			mvd.traceReadTraceAdditionalInfo("outgoing_sequence", outgoing_sequence)
 			mvd.demo.outgoing_sequence = outgoing_sequence
 
-			rt = mvd.traceAddReadTrace("incoming_sequence")
+			mvd.traceAddReadTrace("incoming_sequence")
 			err, incoming_sequence := mvd.readUint()
 			if err != nil {
 				return err
 			}
 
-			if rt != nil {
-				rt.addAdditionalInfo("incoming_sequence", incoming_sequence)
-			}
+			mvd.traceReadTraceAdditionalInfo("incoming_sequence", incoming_sequence)
 			mvd.demo.incoming_sequence = incoming_sequence
 			if mvd.debug != nil {
 				mvd.debug.Printf("Squence in(%v) out(%v)", mvd.demo.incoming_sequence, mvd.demo.outgoing_sequence)
