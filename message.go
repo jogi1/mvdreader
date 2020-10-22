@@ -191,10 +191,10 @@ func (message *Message) Svc_soundlist(mvd *Mvd) error {
 		if err != nil {
 			return err
 		}
-		message.mvd.Server.Soundlist = append(message.mvd.Server.Soundlist, s)
 		if len(s) == 0 {
 			break
 		}
+		message.mvd.Server.Soundlist = append(message.mvd.Server.Soundlist, s)
 	}
 
 	message.traceAddMessageReadTrace("offset")
@@ -218,10 +218,10 @@ func (message *Message) Svc_modellist(mvd *Mvd) error {
 		if err != nil {
 			return err
 		}
-		message.mvd.Server.Modellist = append(message.mvd.Server.Modellist, s)
 		if len(s) == 0 {
 			break
 		}
+		message.mvd.Server.Modellist = append(message.mvd.Server.Modellist, s)
 	}
 	message.traceAddMessageReadTrace("offset")
 	err, _ = message.readByte() // some more indexes
@@ -464,7 +464,6 @@ func (message *Message) Svc_updateentertime(mvd *Mvd) error {
 
 func (message *Message) Svc_updateuserinfo(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("pnum")
-
 	err, pnum := message.readByte()
 	if err != nil {
 		return err
