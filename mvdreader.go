@@ -102,13 +102,16 @@ type State struct {
 	Messages     []ServerMessage
 	Centerprint  []string
 	TempEntities []Tempentity
+	Entities     []Entity
 }
 
 type Entity struct {
-	ModelIndex    int
-	SkinNum       int
-	Frame         int
-	ColorMap      int
+	Index         int
+	ModelIndex    byte
+	SkinNum       byte
+	Frame         byte
+	ColorMap      byte
+	Effects       byte
 	Origin, Angle Vector
 }
 
@@ -124,17 +127,18 @@ type Tempentity struct {
 }
 
 type Server struct {
-	ServerCount    int
-	Gamedir        string
-	Demotime       float32
-	Mapname        string
-	Hostname       string
-	Movevars       []float32
-	Serverinfo     map[string]string
-	Soundlist      []string
-	Modellist      []string
-	Baseline       []Entity
-	StaticEntities []Entity
+	ServerCount     int
+	Gamedir         string
+	Demotime        float32
+	Mapname         string
+	Hostname        string
+	Movevars        []float32
+	Serverinfo      map[string]string
+	Soundlist       []string
+	Modellist       []string
+	Baseline        []*Entity
+	baselineIndexed map[int]*Entity
+	StaticEntities  []Entity
 }
 
 type Mvd struct {
@@ -160,6 +164,7 @@ func Load(input []byte, logger *log.Logger) (error, Mvd) {
 	mvd.file = input
 	mvd.file_length = uint(len(input))
 	mvd.Server.Serverinfo = make(map[string]string, 0)
+	mvd.Server.baselineIndexed = make(map[int]*Entity, 0)
 	mvd.trace.enabled = false
 	return nil, mvd
 }
