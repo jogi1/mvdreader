@@ -129,8 +129,8 @@ func (message *Message) traceAddMessageReadTrace(info string) {
 		return
 	}
 
-	mt := message.mvd.traceGetCurrentMessageTraceReadTrace()
-	mt.Info = info
+	cmt := message.mvd.traceGetCurrentMessageTrace()
+	cmt.addReadTrace(info)
 }
 
 func (message *Message) traceStartMessageReadTrace(identifier string, offsetStart, offsetStop *uint, value interface{}) {
