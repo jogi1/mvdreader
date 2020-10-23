@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 )
 
 func (mvd *Mvd) demotimeReadahead() (error, float64) {
@@ -106,12 +107,14 @@ func (mvd *Mvd) readUint() (error, uint32) {
 func (mvd *Mvd) readIt(cmd DEM_TYPE) (error, bool) {
 	mvd.traceStartReadItTrace()
 	mvd.traceAddReadTrace("current_size")
+	fmt.Println(mvd.file_offset)
 	err, i := mvd.readUint()
 	if err != nil {
 		return err, false
 	}
 
 	current_size := int(i)
+	fmt.Println(i, current_size)
 	mvd.traceReadItTraceCurrentSize(current_size)
 
 	if current_size == 0 {
@@ -125,9 +128,16 @@ func (mvd *Mvd) readIt(cmd DEM_TYPE) (error, bool) {
 	if mvd.debug != nil {
 		mvd.debug.Printf("------------- moving ahead %v from (%v) to (%v) filesize: %v", current_size, old_offset, mvd.file_offset, len(mvd.file))
 	}
-	err = mvd.messageParse(Message{size: uint(current_size), data: mvd.file[old_offset:mvd.file_offset]})
+	if mvd.file_offset > mvd.file_length {
+		return fmt.Errorf("offset (%d) larger than filesize (%d)\n", mvd.file_offset, mvd.file_length), false
+	}
+	message := Message{size: uint(current_size), data: mvd.file[old_offset:mvd.file_offset]}
+	err, fullRead := mvd.messageParse(message)
 	if err != nil {
 		return err, false
+	}
+	if fullRead {
+		return nil, false
 	}
 	if mvd.demo.last_type == dem_multiple {
 		if mvd.debug != nil {

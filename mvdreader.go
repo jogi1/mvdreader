@@ -257,6 +257,7 @@ func (mvd *Mvd) readFrame() error {
 					}
 					mvd.demo.last_to = uint(i)
 					mvd.traceReadTraceAdditionalInfo("last_to", uint(i))
+					mvd.traceReadTraceAdditionalInfo("last_to_binary", strconv.FormatInt(int64(mvd.demo.last_to), 2))
 					if mvd.debug != nil {
 						mvd.debug.Println("affected players: ", strconv.FormatInt(int64(mvd.demo.last_to), 2), mvd.demo.last_to)
 					}

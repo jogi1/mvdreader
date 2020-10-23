@@ -27,11 +27,11 @@ func (mvd *Mvd) emitEventSound(sound *Sound) {
 	mvd.State.SoundsActive = append(mvd.State.SoundsActive, *sound)
 }
 
-func (mvd *Mvd) messageParse(message Message) error {
+func (mvd *Mvd) messageParse(message Message) (error, bool) {
 	message.mvd = mvd
 	for {
 		if mvd.done == true {
-			return nil
+			return nil, true
 		}
 
 		mvd.traceStartMessageTrace(&message)
@@ -39,7 +39,7 @@ func (mvd *Mvd) messageParse(message Message) error {
 
 		err, msgt := message.readByte()
 		if err != nil {
-			return err
+			return err, false
 		}
 		msg_type := SVC_TYPE(msgt)
 		mvd.traceMessageInfo(msg_type)
@@ -52,19 +52,19 @@ func (mvd *Mvd) messageParse(message Message) error {
 		if m.IsValid() == true {
 			m.Call([]reflect.Value{reflect.ValueOf(mvd)})
 		} else {
-			return errors.New(fmt.Sprint("error for message type: %#v %#v", msg_type, m))
+			return errors.New(fmt.Sprint("error for message type: %#v %#v", msg_type, m)), false
 		}
 		if message.offset >= message.size {
-			return nil
+			return nil, true
 		}
 		if mvd.done {
-			return nil
+			return nil, true
 		}
 	}
 	if message.offset != message.size {
-		return errors.New(fmt.Sprint("did not read message fully ", message.offset, message.size))
+		return errors.New(fmt.Sprint("did not read message fully ", message.offset, message.size)), false
 	}
-	return nil
+	return nil, true
 }
 
 func (message *Message) Svc_serverdata(mvd *Mvd) error {
