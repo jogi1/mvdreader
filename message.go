@@ -52,7 +52,7 @@ func (mvd *Mvd) messageParse(message Message) (error, bool) {
 		if m.IsValid() == true {
 			m.Call([]reflect.Value{reflect.ValueOf(mvd)})
 		} else {
-			return errors.New(fmt.Sprint("error for message type: %#v %#v", msg_type, m)), false
+			return errors.New(fmt.Sprintf("error for message type: %#v %#v", msg_type, m)), false
 		}
 		if message.offset >= message.size {
 			return nil, true
@@ -233,11 +233,10 @@ func (message *Message) Svc_modellist(mvd *Mvd) error {
 
 func (message *Message) Svc_spawnbaseline(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("index")
-	err, index := message.readShort() // guess we dont care? these should be auto 'indexed'
+	err, index := message.readShort()
 	if err != nil {
 		return err
 	}
-
 	err, entity := message.parseBaseline(mvd)
 	entity.Index = index
 	mvd.Server.baselineIndexed[index] = entity
@@ -283,6 +282,7 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 
 	message.traceAddMessageReadTrace("frame")
 	err, frame := message.readByte()
+	p.Frame = int(frame)
 	if err != nil {
 		return err
 	}
@@ -501,6 +501,7 @@ func (message *Message) Svc_updateuserinfo(mvd *Mvd) error {
 				p.Spectator = true
 			}
 		}
+		p.Setinfo[splits[i]] = v
 	}
 	mvd.emitEventPlayer(p, pnum, PE_USERINFO)
 	return nil
@@ -558,7 +559,6 @@ func (message *Message) Svc_sound(mvd *Mvd) error {
 		return err
 	}
 	s.Origin.Set(x, y, z)
-	mvd.State.SoundsActive = append(mvd.State.SoundsActive, s)
 	mvd.emitEventSound(&s)
 	return nil
 }
@@ -709,7 +709,6 @@ func (message *Message) Svc_updatestat(mvd *Mvd) error {
 }
 
 func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
-	var entity Entity
 	message.traceAddMessageReadTrace("from")
 	err, _ := message.readByte()
 	if err != nil {
@@ -727,18 +726,38 @@ func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 		}
 
 		message.traceMessageReadAdditionlInfo("num", w&511)
+		entNum := w & 511
+		var entity *Entity
+		for _, e := range mvd.State.Entities {
+			if e.Index == entNum {
+				entity = &e
+				break
+			}
+		}
+		if entity == nil {
+			message.traceMessageReadAdditionlInfo("entity", fmt.Sprintf("%d not found", entNum))
+			entity = new(Entity)
+			//return fmt.Errorf("entity with index: %d not found\n", entNum)
+		}
 		w &= ^511
 		bits := w
 
 		message.traceMessageReadAdditionlInfo("bits", bits)
+		message.traceMessageReadAdditionlInfo("whats the return?", bits&U_MOREBITS == U_MOREBITS)
+		message.traceMessageReadAdditionlInfo("morebits", U_MOREBITS)
 		if bits&U_MOREBITS == U_MOREBITS {
 			message.traceAddMessageReadTrace("morebits")
+			message.traceMessageReadAdditionlInfo("morebits happaned?", "?")
 			err, i := message.readByte()
 
 			if err != nil {
 				return err
 			}
 			bits |= int(i)
+		}
+
+		if bits&U_REMOVE == U_REMOVE {
+			message.traceMessageReadAdditionlInfo("entity removed", "")
 		}
 
 		if bits&U_MODEL == U_MODEL {
@@ -819,12 +838,29 @@ func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 				return err
 			}
 		}
+		if bits&U_REMOVE == U_REMOVE {
+			found := false
+			i := -1
+			for x, e := range mvd.State.Entities {
+				if e.Index == entNum {
+					found = true
+					i = x
+					break
+				}
+			}
+			if found {
+				mvd.State.Entities = append(mvd.State.Entities[:i], mvd.State.Entities[i+1:]...)
+			} else {
+				message.traceMessageReadAdditionlInfo("DEBUG FIND", fmt.Sprintf("index(%d)", entNum))
+			}
+		}
 	}
 	return nil
 }
 
 func (message *Message) Svc_packetentities(mvd *Mvd) error {
 	count := 0
+	mvd.State.Entities = nil
 	for {
 		message.traceMessageReadAdditionlInfo("entity start:", count)
 		count++
@@ -845,8 +881,14 @@ func (message *Message) Svc_packetentities(mvd *Mvd) error {
 		w &= ^511
 		message.traceMessageReadAdditionlInfo("newnum", newnum)
 		entity := new(Entity)
-		// FIXME
-		//*entity = *mvd.Server.baselineIndexed[newnum]
+		et := mvd.Server.baselineIndexed[newnum]
+		if et != nil {
+			*entity = *et
+			message.traceMessageReadAdditionlInfo("baseline ", fmt.Sprintf("found (%s)", mvd.Server.Modellist[entity.ModelIndex]))
+		} else {
+			message.traceMessageReadAdditionlInfo("baseline ", fmt.Sprintf("not found index(%d)", newnum))
+		}
+		entity.Index = newnum
 		bits := w
 
 		if bits&U_MOREBITS == U_MOREBITS {
@@ -868,6 +910,7 @@ func (message *Message) Svc_packetentities(mvd *Mvd) error {
 			if err != nil {
 				return err
 			}
+			message.traceMessageReadAdditionlInfo("modelname: ", mvd.Server.Modellist[entity.ModelIndex])
 		}
 		if bits&U_FRAME == U_FRAME {
 			message.traceAddMessageReadTrace("frame")
@@ -949,10 +992,13 @@ func (message *Message) Svc_packetentities(mvd *Mvd) error {
 func (message *Message) Svc_temp_entity(mvd *Mvd) error {
 	entity := new(Tempentity)
 	message.traceAddMessageReadTrace("flags")
-	err, t := message.readByte()
+	err, b := message.readByte()
 	if err != nil {
 		return err
 	}
+
+	t := TE_TYPE(b)
+	entity.Type = t
 
 	if t == TE_GUNSHOT || t == TE_BLOOD {
 		message.traceAddMessageReadTrace("count")
@@ -1236,6 +1282,45 @@ func (message *Message) Svc_intermission(mvd *Mvd) error {
 func (message *Message) Svc_disconnect(mvd *Mvd) error {
 	mvd.done = true
 	return nil
+}
+
+func (message *Message) Svc_setpause(mvd *Mvd) error {
+	err, _ := message.readByte()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (message *Message) Svc_fte_modellistshort(mvd *Mvd) error {
+	message.traceAddMessageReadTrace("index_start")
+	err, _ := message.readShort() // those are some indexes
+	if err != nil {
+		return err
+	}
+	for {
+		message.traceAddMessageReadTrace("name")
+		err, s := message.readString()
+		if err != nil {
+			return err
+		}
+		if len(s) == 0 {
+			break
+		}
+		message.mvd.Server.Modellist = append(message.mvd.Server.Modellist, s)
+	}
+	message.traceAddMessageReadTrace("offset")
+	err, _ = message.readByte() // some more indexes
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// FIXME: this should never happen
+func (message *Message) Svc_setview(mvd *Mvd) error {
+	err, _ := message.readShort()
+	return err
 }
 
 func (message *Message) readBytes(count uint) (error, *bytes.Buffer) {

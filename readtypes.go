@@ -22,8 +22,8 @@ func (mvd *Mvd) demotime() error {
 		return err
 	}
 
-	mvd.traceReadTraceAdditionalInfo("demotime_change", float64(b)*0.0001)
-	mvd.demo.time += float64(b) * 0.0001
+	mvd.traceReadTraceAdditionalInfo("demotime_change", float64(b)*0.001)
+	mvd.demo.time += float64(b) * 0.001
 	if mvd.debug != nil {
 		mvd.debug.Printf("time (%v)", mvd.demo.time)
 	}
@@ -106,15 +106,12 @@ func (mvd *Mvd) readUint() (error, uint32) {
 
 func (mvd *Mvd) readIt(cmd DEM_TYPE) (error, bool) {
 	mvd.traceStartReadItTrace()
-	mvd.traceAddReadTrace("current_size")
-	fmt.Println(mvd.file_offset)
 	err, i := mvd.readUint()
 	if err != nil {
 		return err, false
 	}
 
 	current_size := int(i)
-	fmt.Println(i, current_size)
 	mvd.traceReadItTraceCurrentSize(current_size)
 
 	if current_size == 0 {

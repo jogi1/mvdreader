@@ -50,6 +50,7 @@ type Player struct {
 	Ping        int
 	Pl          byte
 	Entertime   float32
+	Frame       int
 
 	// stat
 	Health       int
@@ -116,6 +117,7 @@ type Entity struct {
 }
 
 type Tempentity struct {
+	Type       TE_TYPE
 	ModelIndex int
 	SkinNum    int
 	Frame      int
@@ -139,6 +141,7 @@ type Server struct {
 	Baseline        []*Entity
 	baselineIndexed map[int]*Entity
 	StaticEntities  []Entity
+	Paused          bool
 }
 
 type Mvd struct {
@@ -165,6 +168,8 @@ func Load(input []byte, logger *log.Logger) (error, Mvd) {
 	mvd.file_length = uint(len(input))
 	mvd.Server.Serverinfo = make(map[string]string, 0)
 	mvd.Server.baselineIndexed = make(map[int]*Entity, 0)
+	// FIXME - this is garbage we need to fix this in some other way
+	mvd.Server.Modellist = append(mvd.Server.Modellist, "")
 	mvd.trace.enabled = false
 	return nil, mvd
 }
@@ -196,11 +201,18 @@ func (mvd *Mvd) ParseFrame() (error, bool) {
 	}
 	mvd.State_last_frame = State(mvd.State)
 	mvd.State_last_frame.Serverinfo = mvd.State.Serverinfo
+	mvd.State_last_frame.TempEntities = mvd.State.TempEntities
+	mvd.State.TempEntities = nil
+	mvd.State_last_frame.SoundsActive = mvd.State.SoundsActive
+	mvd.State.SoundsActive = nil
 	mvd.State.Serverinfo = nil
 	mvd.State_last_frame.Messages = mvd.State.Messages
 	mvd.State.Messages = nil
 	for i, _ := range mvd.State.Players {
 		mvd.State.Players[i].Setinfo = make(map[string]string)
+		for k, v := range mvd.State_last_frame.Players[i].Setinfo {
+			mvd.State.Players[i].Setinfo[k] = v
+		}
 	}
 
 	mvd.traceParseFrameStart()
@@ -314,7 +326,6 @@ func (mvd *Mvd) readFrame() error {
 				return err
 			}
 
-			mvd.traceReadTraceAdditionalInfo("incoming_sequence", incoming_sequence)
 			mvd.demo.incoming_sequence = incoming_sequence
 			if mvd.debug != nil {
 				mvd.debug.Printf("Squence in(%v) out(%v)", mvd.demo.incoming_sequence, mvd.demo.outgoing_sequence)

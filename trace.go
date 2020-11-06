@@ -75,6 +75,7 @@ type TraceRead struct {
 type TraceMessageTrace struct {
 	Message     *Message
 	Type        SVC_TYPE
+	TypeString  string
 	Reads       []*TraceRead
 	MessageData []byte
 	currentRead *TraceRead
@@ -280,6 +281,7 @@ func (mvd *Mvd) traceMessageInfo(msgType SVC_TYPE) {
 	rit := mvd.getReadItTrace()
 	cmt := rit.currentMessageTrace
 	cmt.Type = msgType
+	cmt.TypeString = msgType.String()
 }
 
 func (mvd *Mvd) traceStartMessageTraceReadTrace(info string) {

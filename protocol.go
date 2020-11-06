@@ -75,6 +75,7 @@ const (
 	svc_serverinfo          SVC_TYPE = 52 // serverinfo
 	svc_updatepl            SVC_TYPE = 53 // [byte] [byte]
 	svc_nails2              SVC_TYPE = 54
+	svc_fte_modellistshort  SVC_TYPE = 60
 	svc_qizmovoice          SVC_TYPE = 83
 )
 
@@ -161,21 +162,24 @@ const (
 	U_SOLID    = (1 << 6) // the entity should be solid for prediction
 )
 
+//go:generate stringer -type=TE_TYPE
+type TE_TYPE byte
+
 const (
-	TE_SPIKE          = 0
-	TE_SUPERSPIKE     = 1
-	TE_GUNSHOT        = 2
-	TE_EXPLOSION      = 3
-	TE_TAREXPLOSION   = 4
-	TE_LIGHTNING1     = 5
-	TE_LIGHTNING2     = 6
-	TE_WIZSPIKE       = 7
-	TE_KNIGHTSPIKE    = 8
-	TE_LIGHTNING3     = 9
-	TE_LAVASPLASH     = 10
-	TE_TELEPORT       = 11
-	TE_BLOOD          = 12
-	TE_LIGHTNINGBLOOD = 13
+	TE_SPIKE          TE_TYPE = 0
+	TE_SUPERSPIKE     TE_TYPE = 1
+	TE_GUNSHOT        TE_TYPE = 2
+	TE_EXPLOSION      TE_TYPE = 3
+	TE_TAREXPLOSION   TE_TYPE = 4
+	TE_LIGHTNING1     TE_TYPE = 5
+	TE_LIGHTNING2     TE_TYPE = 6
+	TE_WIZSPIKE       TE_TYPE = 7
+	TE_KNIGHTSPIKE    TE_TYPE = 8
+	TE_LIGHTNING3     TE_TYPE = 9
+	TE_LAVASPLASH     TE_TYPE = 10
+	TE_TELEPORT       TE_TYPE = 11
+	TE_BLOOD          TE_TYPE = 12
+	TE_LIGHTNINGBLOOD TE_TYPE = 13
 )
 
 //go:generate stringer -type=STAT_TYPE
