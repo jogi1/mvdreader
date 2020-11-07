@@ -46,6 +46,7 @@ func (mvd *Mvd) messageParse(message Message) (error, bool) {
 
 		if mvd.debug != nil {
 			mvd.debug.Println("handling: ", msg_type)
+			mvd.debug.Println("expected function: ", strings.Title(fmt.Sprintf("%s", msg_type)))
 		}
 		m := reflect.ValueOf(&message).MethodByName(strings.Title(fmt.Sprintf("%s", msg_type)))
 
@@ -708,6 +709,10 @@ func (message *Message) Svc_updatestat(mvd *Mvd) error {
 	return nil
 }
 
+func (message *Message) ParseDelta(mvd *Mvd, from, to *Entity) error {
+	return nil
+}
+
 func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("from")
 	err, _ := message.readByte()
@@ -734,10 +739,10 @@ func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 				break
 			}
 		}
+
 		if entity == nil {
 			message.traceMessageReadAdditionlInfo("entity", fmt.Sprintf("%d not found", entNum))
 			entity = new(Entity)
-			//return fmt.Errorf("entity with index: %d not found\n", entNum)
 		}
 		w &= ^511
 		bits := w
@@ -747,21 +752,68 @@ func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 		message.traceMessageReadAdditionlInfo("morebits", U_MOREBITS)
 		if bits&U_MOREBITS == U_MOREBITS {
 			message.traceAddMessageReadTrace("morebits")
-			message.traceMessageReadAdditionlInfo("morebits happaned?", "?")
 			err, i := message.readByte()
-
 			if err != nil {
 				return err
 			}
 			bits |= int(i)
 		}
 
-		if bits&U_REMOVE == U_REMOVE {
-			message.traceMessageReadAdditionlInfo("entity removed", "")
+		morebits := 0
+		if bits&U_FTE_EVENVENMORE == U_FTE_EVENVENMORE {
+			err, i := message.readByte()
+			if err != nil {
+				return err
+			}
+			morebits = int(i)
+			if morebits&U_FTE_YETMORE == U_FTE_YETMORE {
+				err, mi := message.readByte()
+				if err != nil {
+					return err
+				}
+				morebits = morebits | int(mi)<<8
+
+			}
 		}
 
-		if bits&U_MODEL == U_MODEL {
+		if bits&U_MOREBITS == U_MOREBITS {
+			if mvd.demo.fte_pext&FTE_PEXT_ENTITYDBL == FTE_PEXT_ENTITYDBL {
+				err, evenMore := message.peekByte(0)
+				if err != nil {
+					return err
+				}
+				if evenMore&U_FTE_EVENVENMORE == U_FTE_EVENVENMORE {
+					err, evenMore = message.peekByte(1)
+					if err != nil {
+						return err
+					}
+					if evenMore&U_FTE_ENTITYDBL == U_FTE_ENTITYDBL {
+						entNum += 512
+					}
+					if evenMore&U_FTE_ENTITYDBL2 == U_FTE_ENTITYDBL2 {
+						entNum += 1024
+					}
+				}
+			}
+		}
 
+		if bits&U_REMOVE == U_REMOVE {
+			message.traceMessageReadAdditionlInfo("entity removed", "")
+			if mvd.demo.fte_pext&FTE_PEXT_ENTITYDBL == FTE_PEXT_ENTITYDBL && bits&U_MOREBITS == U_MOREBITS {
+				message.traceAddMessageReadTrace("fte extension")
+				err, ftext := message.readByte()
+				if err != nil {
+					return err
+				}
+				if ftext&U_FTE_EVENVENMORE == U_FTE_EVENVENMORE {
+					err, _ := message.readByte()
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+		if bits&U_MODEL == U_MODEL {
 			message.traceAddMessageReadTrace("model")
 			err, entity.ModelIndex = message.readByte()
 			if err != nil {
@@ -853,6 +905,15 @@ func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 			} else {
 				message.traceMessageReadAdditionlInfo("DEBUG FIND", fmt.Sprintf("index(%d)", entNum))
 			}
+		}
+
+		// FIXME: do all the other fte stuff
+		if morebits&U_FTE_TRANS == U_FTE_TRANS {
+			err, b := message.readByte()
+			if err != nil {
+				return err
+			}
+			entity.Transparency = b
 		}
 	}
 	return nil
@@ -1317,6 +1378,141 @@ func (message *Message) Svc_fte_modellistshort(mvd *Mvd) error {
 	return nil
 }
 
+func (message *Message) Svc_fte_spawnbaseline2(mvd *Mvd) error {
+	message.traceAddMessageReadTrace("index")
+	err, bits := message.readShort()
+	message.traceMessageReadAdditionlInfo("num", bits&511)
+	entNum := bits & 511
+	if err != nil {
+		return err
+	}
+
+	bits &= ^511
+	if bits&U_MOREBITS == U_MOREBITS {
+		message.traceAddMessageReadTrace("morebits")
+		message.traceMessageReadAdditionlInfo("morebits happaned?", "?")
+		err, i := message.readByte()
+
+		if err != nil {
+			return err
+		}
+		bits |= int(i)
+	}
+
+	morebits := 0
+	if bits&U_FTE_EVENVENMORE == U_FTE_EVENVENMORE {
+		err, i := message.readByte()
+		if err != nil {
+			return err
+		}
+		morebits = int(i)
+		if morebits&U_FTE_YETMORE == U_FTE_YETMORE {
+			err, mi := message.readByte()
+			if err != nil {
+				return err
+			}
+			morebits = morebits | int(mi)<<8
+
+		}
+	}
+
+	entity := new(Entity)
+	entity.Index = entNum
+
+	if bits&U_MODEL == U_MODEL {
+		message.traceAddMessageReadTrace("model")
+		err, entity.ModelIndex = message.readByte()
+		if err != nil {
+			return err
+		}
+	}
+	if bits&U_FRAME == U_FRAME {
+		message.traceAddMessageReadTrace("frame")
+		err, entity.Frame = message.readByte()
+		if err != nil {
+			return err
+		}
+	}
+	if bits&U_COLORMAP == U_COLORMAP {
+		message.traceAddMessageReadTrace("colormap")
+		err, entity.ColorMap = message.readByte()
+		if err != nil {
+			return err
+		}
+	}
+	if bits&U_SKIN == U_SKIN {
+		message.traceAddMessageReadTrace("skin")
+		err, entity.SkinNum = message.readByte()
+		if err != nil {
+			return err
+		}
+	}
+	if bits&U_EFFECTS == U_EFFECTS {
+		message.traceAddMessageReadTrace("effects")
+		err, entity.Effects = message.readByte()
+		if err != nil {
+			return err
+		}
+	}
+	if bits&U_ORIGIN1 == U_ORIGIN1 {
+		message.traceAddMessageReadTrace("Origin.X")
+		err, entity.Origin.X = message.readCoord()
+		if err != nil {
+			return err
+		}
+	}
+	if bits&U_ANGLE1 == U_ANGLE1 {
+		message.traceAddMessageReadTrace("Angle.X")
+		err, entity.Angle.X = message.readAngle()
+		if err != nil {
+			return err
+		}
+	}
+	if bits&U_ORIGIN2 == U_ORIGIN2 {
+		message.traceAddMessageReadTrace("Origin.Y")
+		err, entity.Origin.Y = message.readCoord()
+		if err != nil {
+			return err
+		}
+	}
+	if bits&U_ANGLE2 == U_ANGLE2 {
+		message.traceAddMessageReadTrace("Angle.Y")
+		err, entity.Angle.Y = message.readAngle()
+		if err != nil {
+			return err
+		}
+	}
+	if bits&U_ORIGIN3 == U_ORIGIN3 {
+		message.traceAddMessageReadTrace("Origin.Z")
+		err, entity.Origin.Z = message.readCoord()
+		if err != nil {
+			return err
+		}
+	}
+	if bits&U_ANGLE3 == U_ANGLE3 {
+		message.traceAddMessageReadTrace("Angle.Z")
+		err, entity.Angle.Z = message.readAngle()
+		if err != nil {
+			return err
+		}
+	}
+	if morebits&U_FTE_TRANS == U_FTE_TRANS {
+		err, t := message.readByte()
+		if err != nil {
+			return err
+		}
+		entity.Transparency = t
+	}
+	if morebits&U_FTE_ENTITYDBL == U_FTE_ENTITYDBL {
+		entity.Index += 512
+	}
+	if morebits&U_FTE_ENTITYDBL2 == U_FTE_ENTITYDBL2 {
+		entity.Index += 1024
+	}
+	mvd.Server.Baseline = append(mvd.Server.Baseline, entity)
+	return nil
+}
+
 // FIXME: this should never happen
 func (message *Message) Svc_setview(mvd *Mvd) error {
 	err, _ := message.readShort()
@@ -1471,4 +1667,37 @@ func (message *Message) readShort() (error, int) {
 	}
 	message.traceStartMessageReadTrace("readShort", nil, &message.offset, int(i))
 	return nil, int(i)
+}
+
+func (message *Message) peekBytes(count, offset uint) (error, *bytes.Buffer) {
+	offs := new(uint)
+	*offs = message.offset + offset
+	message.traceStartMessageReadTrace("peekBytes", &message.offset, nil, nil)
+	if message.offset+count > message.size {
+		return errors.New("reading beyond message length"), nil
+	}
+	b := bytes.NewBuffer(message.data[message.offset : message.offset+count])
+	offs = new(uint)
+	*offs = message.offset + offset + count
+	message.traceStartMessageReadTrace("peekBytes", nil, offs, b)
+	return nil, b
+}
+
+func (message *Message) peekByte(offset uint) (error, byte) {
+	var b byte
+	offs := new(uint)
+	*offs = message.offset + offset
+	message.traceStartMessageReadTrace("peekByte", offs, nil, nil)
+	err, barray := message.peekBytes(1, offset)
+	if err != nil {
+		return err, byte(0)
+	}
+	err = binary.Read(barray, binary.BigEndian, &b)
+	if err != nil {
+		return err, byte(0)
+	}
+	offs = new(uint)
+	*offs = message.offset + offset + 1
+	message.traceStartMessageReadTrace("peekByte", nil, offs, b)
+	return nil, b
 }

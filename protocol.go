@@ -76,6 +76,7 @@ const (
 	svc_updatepl            SVC_TYPE = 53 // [byte] [byte]
 	svc_nails2              SVC_TYPE = 54
 	svc_fte_modellistshort  SVC_TYPE = 60
+	svc_fte_spawnbaseline2  SVC_TYPE = 66
 	svc_qizmovoice          SVC_TYPE = 83
 )
 
@@ -160,6 +161,15 @@ const (
 	U_SKIN     = (1 << 4)
 	U_EFFECTS  = (1 << 5)
 	U_SOLID    = (1 << 6) // the entity should be solid for prediction
+)
+
+// FTE
+const (
+	U_FTE_EVENVENMORE = (1 << 7)
+	U_FTE_YETMORE     = (1 << 7)
+	U_FTE_TRANS       = (1 << 1) //transparency value
+	U_FTE_ENTITYDBL   = (1 << 5) //use an extra byte for origin parts, cos one of them is off
+	U_FTE_ENTITYDBL2  = (1 << 6) //use an extra byte for origin parts, cos one of them is off
 )
 
 //go:generate stringer -type=TE_TYPE

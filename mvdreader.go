@@ -114,6 +114,7 @@ type Entity struct {
 	ColorMap      byte
 	Effects       byte
 	Origin, Angle Vector
+	Transparency  byte
 }
 
 type Tempentity struct {

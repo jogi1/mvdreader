@@ -64,12 +64,16 @@ func _() {
 	_ = x[svc_serverinfo-52]
 	_ = x[svc_updatepl-53]
 	_ = x[svc_nails2-54]
+	_ = x[svc_fte_modellistshort-60]
+	_ = x[svc_fte_spawnbaseline2-66]
 	_ = x[svc_qizmovoice-83]
 }
 
 const (
 	_SVC_TYPE_name_0 = "svc_badsvc_nopsvc_disconnectsvc_updatestatnq_svc_versionsvc_setviewsvc_soundnq_svc_timesvc_printsvc_stufftextsvc_setanglesvc_serverdatasvc_lightstylenq_svc_updatenamesvc_updatefragsnq_svc_clientdatasvc_stopsoundnq_svc_updatecolorsnq_svc_particlesvc_damagesvc_spawnstaticsvc_spawnbinarysvc_spawnbaselinesvc_temp_entitysvc_setpausenq_svc_signonnumsvc_centerprintsvc_killedmonstersvc_foundsecretsvc_spawnstaticsoundsvc_intermissionsvc_finalesvc_cdtracksvc_sellscreennq_svc_cutscenesvc_bigkicksvc_updatepingsvc_updateentertimesvc_updatestatlongsvc_muzzleflashsvc_updateuserinfosvc_downloadsvc_playerinfosvc_nailssvc_chokecountsvc_modellistsvc_soundlistsvc_packetentitiessvc_deltapacketentitiessvc_maxspeedsvc_entgravitysvc_setinfosvc_serverinfosvc_updateplsvc_nails2"
-	_SVC_TYPE_name_1 = "svc_qizmovoice"
+	_SVC_TYPE_name_1 = "svc_fte_modellistshort"
+	_SVC_TYPE_name_2 = "svc_fte_spawnbaseline2"
+	_SVC_TYPE_name_3 = "svc_qizmovoice"
 )
 
 var (
@@ -80,8 +84,12 @@ func (i SVC_TYPE) String() string {
 	switch {
 	case 0 <= i && i <= 54:
 		return _SVC_TYPE_name_0[_SVC_TYPE_index_0[i]:_SVC_TYPE_index_0[i+1]]
-	case i == 83:
+	case i == 60:
 		return _SVC_TYPE_name_1
+	case i == 66:
+		return _SVC_TYPE_name_2
+	case i == 83:
+		return _SVC_TYPE_name_3
 	default:
 		return "SVC_TYPE(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
