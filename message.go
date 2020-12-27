@@ -1353,6 +1353,11 @@ func (message *Message) Svc_setpause(mvd *Mvd) error {
 	return nil
 }
 
+func (message *Message) Svc_secretfound(mvd *Mvd) error {
+	// TODO: maybe add this to the playerinfo
+	return nil
+}
+
 func (message *Message) Svc_fte_modellistshort(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("index_start")
 	err, _ := message.readShort() // those are some indexes
