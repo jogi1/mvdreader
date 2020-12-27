@@ -1353,7 +1353,7 @@ func (message *Message) Svc_setpause(mvd *Mvd) error {
 	return nil
 }
 
-func (message *Message) Svc_secretfound(mvd *Mvd) error {
+func (message *Message) Svc_foundsecret(mvd *Mvd) error {
 	// TODO: maybe add this to the playerinfo
 	return nil
 }
