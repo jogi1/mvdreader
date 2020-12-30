@@ -204,6 +204,7 @@ func (mvd *Mvd) ParseFrame() (error, bool) {
 	mvd.State_last_frame.Serverinfo = mvd.State.Serverinfo
 	mvd.State_last_frame.TempEntities = mvd.State.TempEntities
 	mvd.State.TempEntities = nil
+	mvd.State.Centerprint = nil
 	mvd.State_last_frame.SoundsActive = mvd.State.SoundsActive
 	mvd.State.SoundsActive = nil
 	mvd.State.Serverinfo = nil
