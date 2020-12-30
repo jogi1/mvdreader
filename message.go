@@ -490,6 +490,9 @@ func (message *Message) Svc_updateuserinfo(mvd *Mvd) error {
 	}
 	ui = ui[1:]
 	splits := strings.Split(ui, "\\")
+
+	p.Spectator = false
+	p.Setinfo["*spectator"] = "0"
 	for i := 0; i < len(splits); i += 2 {
 		v := splits[i+1]
 		switch splits[i] {
