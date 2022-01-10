@@ -17,7 +17,6 @@ type Message struct {
 }
 
 func (mvd *Mvd) emitEventPlayer(player *Player, pnum byte, pe_type PE_TYPE) {
-
 	player.EventInfo.Pnum = pnum
 	player.EventInfo.Events |= pe_type
 }
@@ -172,10 +171,22 @@ func (message *Message) Svc_cdtrack(mvd *Mvd) error {
 }
 
 func (message *Message) Svc_stufftext(mvd *Mvd) error {
-	message.traceAddMessageReadTrace("text")
-	err, _ := message.readString()
+	message.traceAddMessageReadTrace("stufftext")
+	err, s := message.readString()
 	if err != nil {
 		return err
+	}
+
+	message.mvd.State.StuffText = append(message.mvd.State.StuffText, s)
+
+	if strings.HasPrefix(s, "fullserverinfo") {
+		trim := s[len("fullserverinfo \"\\"):]
+		trim = strings.TrimRight(trim, "\\\"")
+		splits := strings.Split(trim, "\\")
+
+		for i := 0; i < len(splits); i += 2 {
+			message.mvd.Server.Serverinfo[splits[i]] = splits[i+1]
+		}
 	}
 	return nil
 }
@@ -948,7 +959,10 @@ func (message *Message) Svc_packetentities(mvd *Mvd) error {
 		et := mvd.Server.baselineIndexed[newnum]
 		if et != nil {
 			*entity = *et
-			message.traceMessageReadAdditionlInfo("baseline ", fmt.Sprintf("found (%s)", mvd.Server.Modellist[entity.ModelIndex]))
+			message.traceMessageReadAdditionlInfo(
+				"baseline ",
+				fmt.Sprintf("found (%s)", mvd.Server.Modellist[entity.ModelIndex]),
+			)
 		} else {
 			message.traceMessageReadAdditionlInfo("baseline ", fmt.Sprintf("not found index(%d)", newnum))
 		}
@@ -1638,7 +1652,6 @@ func (message *Message) readAngle() (error, float32) {
 		err, a := message.readAngle16()
 		if err != nil {
 			return err, 0
-
 		}
 		message.traceStartMessageReadTrace("readAngle", nil, &message.offset, a)
 		return nil, a

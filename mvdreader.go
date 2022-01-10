@@ -104,6 +104,7 @@ type State struct {
 	Centerprint  []string
 	TempEntities []Tempentity
 	Entities     []Entity
+	StuffText    []string
 }
 
 type Entity struct {
@@ -210,7 +211,7 @@ func (mvd *Mvd) ParseFrame() (error, bool) {
 	mvd.State.Serverinfo = nil
 	mvd.State_last_frame.Messages = mvd.State.Messages
 	mvd.State.Messages = nil
-	for i, _ := range mvd.State.Players {
+	for i := range mvd.State.Players {
 		mvd.State.Players[i].Setinfo = make(map[string]string)
 		for k, v := range mvd.State_last_frame.Players[i].Setinfo {
 			mvd.State.Players[i].Setinfo[k] = v
@@ -273,7 +274,11 @@ func (mvd *Mvd) readFrame() error {
 					mvd.traceReadTraceAdditionalInfo("last_to", uint(i))
 					mvd.traceReadTraceAdditionalInfo("last_to_binary", strconv.FormatInt(int64(mvd.demo.last_to), 2))
 					if mvd.debug != nil {
-						mvd.debug.Println("affected players: ", strconv.FormatInt(int64(mvd.demo.last_to), 2), mvd.demo.last_to)
+						mvd.debug.Println(
+							"affected players: ",
+							strconv.FormatInt(int64(mvd.demo.last_to), 2),
+							mvd.demo.last_to,
+						)
 					}
 					mvd.demo.last_type = dem_multiple
 					break
@@ -298,7 +303,15 @@ func (mvd *Mvd) readFrame() error {
 				{
 					if mvd.debug != nil {
 						mvd.debug.Println("dem_all", mvd.file_offset)
-						mvd.debug.Println("dem_stats", cmd, cmd&7, dem_stats, mvd.file_offset, "byte: ", mvd.file[mvd.file_offset])
+						mvd.debug.Println(
+							"dem_stats",
+							cmd,
+							cmd&7,
+							dem_stats,
+							mvd.file_offset,
+							"byte: ",
+							mvd.file[mvd.file_offset],
+						)
 					}
 					mvd.traceReadTraceAdditionalInfo("last_to", uint(cmd>>3))
 					mvd.demo.last_to = uint(cmd >> 3)
@@ -359,5 +372,4 @@ func (mvd *Mvd) readFrame() error {
 		mvd.traceReadFrameStop()
 		return errors.New("this should not happen")
 	}
-
 }
