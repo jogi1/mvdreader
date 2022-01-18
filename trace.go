@@ -28,7 +28,7 @@ func (mvd *Mvd) traceParseFrameStop() {
 }
 
 func (mvd *Mvd) traceReadFrameStart() {
-	if mvd.trace.enabled == false {
+	if !mvd.trace.enabled {
 		return
 	}
 	cTrace := new(TraceReadFrame)
@@ -79,6 +79,7 @@ type TraceMessageTrace struct {
 	Reads       []*TraceRead
 	MessageData []byte
 	currentRead *TraceRead
+	OffsetStart uint
 }
 
 func (mt *TraceMessageTrace) addReadTrace(info string) *TraceRead {

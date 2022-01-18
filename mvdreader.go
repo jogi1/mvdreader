@@ -353,7 +353,7 @@ func (mvd *Mvd) readFrame() error {
 			if err != nil {
 				return err
 			}
-			for b == true {
+			for b {
 				if mvd.debug != nil {
 					mvd.debug.Println("did we loop?")
 				}

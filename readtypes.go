@@ -84,7 +84,7 @@ func (mvd *Mvd) readInt() (error, int32) {
 		return err, 0
 	}
 
-	mvd.traceStartReadTrace("readBytes", nil, &mvd.file_offset, i)
+	mvd.traceStartReadTrace("readInt", nil, &mvd.file_offset, i)
 	return nil, i
 }
 
@@ -128,7 +128,16 @@ func (mvd *Mvd) readIt(cmd DEM_TYPE) (error, bool) {
 	if mvd.file_offset > mvd.file_length {
 		return fmt.Errorf("offset (%d) larger than filesize (%d)\n", mvd.file_offset, mvd.file_length), false
 	}
-	message := Message{size: uint(current_size), data: mvd.file[old_offset:mvd.file_offset]}
+	if mvd.demo.last_type == dem_multiple && mvd.demo.last_to == 0 {
+		if mvd.debug != nil {
+			mvd.debug.Println("ReadIt: we skip this message?")
+		}
+		return err, false
+	}
+	message := Message{
+		size:        uint(current_size),
+		data:        mvd.file[old_offset:mvd.file_offset],
+		OffsetStart: old_offset}
 	err, fullRead := mvd.messageParse(message)
 	if err != nil {
 		return err, false

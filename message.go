@@ -10,10 +10,11 @@ import (
 )
 
 type Message struct {
-	size   uint
-	data   []byte
-	offset uint
-	mvd    *Mvd
+	size        uint
+	data        []byte
+	offset      uint
+	OffsetStart uint
+	mvd         *Mvd
 }
 
 func (mvd *Mvd) emitEventPlayer(player *Player, pnum byte, pe_type PE_TYPE) {
@@ -49,7 +50,7 @@ func (mvd *Mvd) messageParse(message Message) (error, bool) {
 		}
 		m := reflect.ValueOf(&message).MethodByName(strings.Title(fmt.Sprintf("%s", msg_type)))
 
-		if m.IsValid() == true {
+		if m.IsValid() {
 			m.Call([]reflect.Value{reflect.ValueOf(mvd)})
 		} else {
 			return errors.New(fmt.Sprintf("error for message type: %#v %#v", msg_type, m)), false
@@ -89,9 +90,7 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 			}
 			message.mvd.demo.fte_pext2 = FTE_PROTOCOL_EXTENSION(fte_pext2)
 			continue
-		}
-
-		if protocol == protocol_fte {
+		} else if protocol == protocol_fte {
 			message.traceAddMessageReadTrace("protocol_fte")
 			err, fte_pext := message.readLong()
 			if err != nil {
@@ -99,9 +98,7 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 			}
 			message.mvd.demo.fte_pext = FTE_PROTOCOL_EXTENSION(fte_pext)
 			continue
-		}
-
-		if protocol == protocol_mvd1 {
+		} else if protocol == protocol_mvd1 {
 			message.traceAddMessageReadTrace("protocol_mvd")
 			err, mvd_pext := message.readLong()
 			if err != nil {
@@ -109,9 +106,10 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 			}
 			message.mvd.demo.mvd_pext = MVD_PROTOCOL_EXTENSION(mvd_pext)
 			continue
-		}
-		if protocol == protocol_standard {
+		} else if protocol == protocol_standard {
 			break
+		} else {
+			return fmt.Errorf("protocol broke!: %d", protocol)
 		}
 	}
 
@@ -249,7 +247,7 @@ func (message *Message) Svc_spawnbaseline(mvd *Mvd) error {
 	if err != nil {
 		return err
 	}
-	err, entity := message.parseBaseline(mvd)
+	entity, err := message.parseBaseline(mvd)
 	entity.Index = index
 	mvd.Server.baselineIndexed[index] = entity
 	if err != nil {
@@ -307,7 +305,6 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 			switch i {
 			case 0:
 				{
-
 					message.traceAddMessageReadTrace("Origin.X")
 					err, coord := message.readCoord()
 					if err != nil {
@@ -415,6 +412,9 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 			return err
 		}
 		p.WeaponFrame = weaponframe // weaponframe
+	}
+	if flags != 0 {
+		return fmt.Errorf("svc_player: flags not fully parsed")
 	}
 
 	mvd.emitEventPlayer(p, pnum, pe_type)
@@ -524,7 +524,7 @@ func (message *Message) Svc_updateuserinfo(mvd *Mvd) error {
 
 func (message *Message) Svc_sound(mvd *Mvd) error {
 	var s Sound
-	message.traceAddMessageReadTrace("flags")
+	message.traceAddMessageReadTrace("channel")
 	err, sc := message.readShort()
 	if err != nil {
 		return err
@@ -703,7 +703,7 @@ func (message *Message) Svc_updatestat(mvd *Mvd) error {
 		return err
 	}
 	p := &mvd.State.Players[mvd.demo.last_to]
-	s := fmt.Sprintf("%s", STAT_TYPE(stat))
+	s := STAT_TYPE(stat).String()
 	s = strings.TrimPrefix(s, "STAT_")
 	s = strings.ToLower(s)
 	s = strings.Title(s)
@@ -717,7 +717,7 @@ func (message *Message) Svc_updatestat(mvd *Mvd) error {
 			}
 		}
 	} else {
-		return errors.New(fmt.Sprintf("unknown STAT_ type: %s\n", stat))
+		return fmt.Errorf("unknown STAT_ type: %s", stat)
 	}
 	mvd.emitEventPlayer(p, byte(mvd.demo.last_to), PE_STATS)
 	return nil
@@ -1237,64 +1237,64 @@ func (message *Message) Svc_chokecount(mvd *Mvd) error {
 	return nil
 }
 
-func (message *Message) parseBaseline(mvd *Mvd) (error, *Entity) {
+func (message *Message) parseBaseline(mvd *Mvd) (*Entity, error) {
 	var err error
 	entity := new(Entity)
 	message.traceAddMessageReadTrace("entity-ModelIndex")
 	err, entity.ModelIndex = message.readByte()
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-ModelFrame")
 	err, entity.Frame = message.readByte()
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-ColorMap")
 	err, entity.ColorMap = message.readByte()
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-SkinNum")
 	err, entity.SkinNum = message.readByte()
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Origin.X")
 	err, entity.Origin.X = message.readCoord()
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Angle.X")
 	err, entity.Angle.X = message.readAngle()
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Origin.Y")
 	err, entity.Origin.Y = message.readCoord()
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Angle.Y")
 	err, entity.Angle.Y = message.readAngle()
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Origin.Z")
 	err, entity.Origin.Z = message.readCoord()
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Angle.Z")
 	err, entity.Angle.Z = message.readAngle()
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
-	return nil, entity
+	return entity, nil
 }
 
 func (message *Message) Svc_spawnstatic(mvd *Mvd) error {
-	err, entity := message.parseBaseline(mvd)
+	entity, err := message.parseBaseline(mvd)
 	if err != nil {
 		return err
 	}
