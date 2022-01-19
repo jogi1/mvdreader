@@ -123,10 +123,16 @@ func (mvd *Mvd) readIt(cmd DEM_TYPE) (error, bool) {
 	old_offset := mvd.file_offset
 	mvd.file_offset += uint(current_size)
 	if mvd.debug != nil {
-		mvd.debug.Printf("------------- moving ahead %v from (%v) to (%v) filesize: %v", current_size, old_offset, mvd.file_offset, len(mvd.file))
+		mvd.debug.Printf(
+			"------------- moving ahead %v from (%v) to (%v) filesize: %v",
+			current_size,
+			old_offset,
+			mvd.file_offset,
+			len(mvd.file),
+		)
 	}
 	if mvd.file_offset > mvd.file_length {
-		return fmt.Errorf("offset (%d) larger than filesize (%d)\n", mvd.file_offset, mvd.file_length), false
+		return fmt.Errorf("offset (%d) larger than filesize (%d)", mvd.file_offset, mvd.file_length), false
 	}
 	if mvd.demo.last_type == dem_multiple && mvd.demo.last_to == 0 {
 		if mvd.debug != nil {
@@ -135,9 +141,11 @@ func (mvd *Mvd) readIt(cmd DEM_TYPE) (error, bool) {
 		return err, false
 	}
 	message := Message{
+		mvd:         mvd,
 		size:        uint(current_size),
-		data:        mvd.file[old_offset:mvd.file_offset],
-		OffsetStart: old_offset}
+		OffsetStart: old_offset,
+		OffsetStop:  mvd.file_offset,
+	}
 	err, fullRead := mvd.messageParse(message)
 	if err != nil {
 		return err, false

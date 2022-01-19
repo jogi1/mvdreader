@@ -166,7 +166,6 @@ func (message *Message) traceStartMessageReadTrace(identifier string, offsetStar
 func (tri *TraceReadIt) addMessageTrace(message *Message) *TraceMessageTrace {
 	mt := new(TraceMessageTrace)
 	mt.Message = message
-	mt.MessageData = message.data
 	tri.currentMessageTrace = mt
 	tri.MessageTrace = append(tri.MessageTrace, mt)
 	return mt

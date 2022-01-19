@@ -11,9 +11,9 @@ import (
 
 type Message struct {
 	size        uint
-	data        []byte
 	offset      uint
 	OffsetStart uint
+	OffsetStop  uint
 	mvd         *Mvd
 }
 
@@ -30,7 +30,7 @@ func (mvd *Mvd) emitEventSound(sound *Sound) {
 func (mvd *Mvd) messageParse(message Message) (error, bool) {
 	message.mvd = mvd
 	for {
-		if mvd.done == true {
+		if mvd.done {
 			return nil, true
 		}
 
@@ -46,14 +46,14 @@ func (mvd *Mvd) messageParse(message Message) (error, bool) {
 
 		if mvd.debug != nil {
 			mvd.debug.Println("handling: ", msg_type)
-			mvd.debug.Println("expected function: ", strings.Title(fmt.Sprintf("%s", msg_type)))
+			mvd.debug.Println("expected function: ", strings.Title(msg_type.String()))
 		}
-		m := reflect.ValueOf(&message).MethodByName(strings.Title(fmt.Sprintf("%s", msg_type)))
+		m := reflect.ValueOf(&message).MethodByName(strings.Title(msg_type.String()))
 
 		if m.IsValid() {
 			m.Call([]reflect.Value{reflect.ValueOf(mvd)})
 		} else {
-			return errors.New(fmt.Sprintf("error for message type: %#v %#v", msg_type, m)), false
+			return fmt.Errorf("error for message type: %#v %#v", msg_type, m), false
 		}
 		if message.offset >= message.size {
 			return nil, true
@@ -1544,9 +1544,9 @@ func (message *Message) Svc_setview(mvd *Mvd) error {
 func (message *Message) readBytes(count uint) (error, *bytes.Buffer) {
 	message.traceStartMessageReadTrace("readBytes", &message.offset, nil, nil)
 	if message.offset+count > message.size {
-		return errors.New("reading beyong message length"), nil
+		return errors.New("reading beyond message length"), nil
 	}
-	b := bytes.NewBuffer(message.data[message.offset : message.offset+count])
+	b := bytes.NewBuffer(message.mvd.file[message.OffsetStart+message.offset : message.OffsetStart+message.offset+count])
 	message.offset += count
 	message.traceStartMessageReadTrace("readBytes", nil, &message.offset, b)
 	return nil, b
@@ -1697,7 +1697,8 @@ func (message *Message) peekBytes(count, offset uint) (error, *bytes.Buffer) {
 	if message.offset+count > message.size {
 		return errors.New("reading beyond message length"), nil
 	}
-	b := bytes.NewBuffer(message.data[message.offset : message.offset+count])
+
+	b := bytes.NewBuffer(message.mvd.file[message.OffsetStart+message.offset : message.OffsetStart+message.offset+count])
 	offs = new(uint)
 	*offs = message.offset + offset + count
 	message.traceStartMessageReadTrace("peekBytes", nil, offs, b)
