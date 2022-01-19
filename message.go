@@ -42,6 +42,7 @@ func (mvd *Mvd) messageParse(message Message) (error, bool) {
 			return err, false
 		}
 		msg_type := SVC_TYPE(msgt)
+        fmt.Println(msg_type)
 		mvd.traceMessageInfo(msg_type)
 
 		if mvd.debug != nil {
@@ -58,6 +59,7 @@ func (mvd *Mvd) messageParse(message Message) (error, bool) {
 		if message.offset >= message.size {
 			return nil, true
 		}
+
 		if mvd.done {
 			return nil, true
 		}

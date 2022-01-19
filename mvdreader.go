@@ -163,22 +163,22 @@ type Mvd struct {
 	State_last_frame State
 }
 
-func Load(input []byte, logger *log.Logger) (error, Mvd) {
+func Load(input []byte, logger *log.Logger) (Mvd, error) {
 	var mvd Mvd
 	mvd.debug = logger
 	mvd.file = input
 	mvd.file_length = uint(len(input))
-	mvd.Server.Serverinfo = make(map[string]string, 0)
-	mvd.Server.baselineIndexed = make(map[int]*Entity, 0)
+	mvd.Server.Serverinfo = make(map[string]string)
+	mvd.Server.baselineIndexed = make(map[int]*Entity)
 	// FIXME - this is garbage we need to fix this in some other way
 	mvd.Server.Modellist = append(mvd.Server.Modellist, "")
 	mvd.trace.enabled = false
-	return nil, mvd
+	return mvd, nil
 }
 
 func (mvd *Mvd) Parse() error {
 	for {
-		err, done := mvd.ParseFrame()
+		done, err := mvd.ParseFrame()
 		if err != nil {
 			return err
 		}
@@ -197,7 +197,7 @@ func (mvd *Mvd) TraceGet() []*TraceParseFrame {
 	return mvd.trace.traces
 }
 
-func (mvd *Mvd) ParseFrame() (error, bool) {
+func (mvd *Mvd) ParseFrame() ( bool, error) {
 	if mvd.debug != nil {
 		mvd.debug.Printf("Frame (%v)", mvd.Frame)
 	}
@@ -225,12 +225,20 @@ func (mvd *Mvd) ParseFrame() (error, bool) {
 		if err != nil {
 			if mvd.done {
 				mvd.traceParseFrameStop()
-				return nil, mvd.done
+				return mvd.done, nil
 			}
-			return err, false
+			return false, err
 		}
+
+        if mvd.done {
+            mvd.traceParseFrameStop()
+            return mvd.done, nil
+        }
 		mvd.Frame++
-		err, readahead_time := mvd.demotimeReadahead()
+		readahead_time, err := mvd.demotimeReadahead()
+        if err != nil {
+			return false, err
+        }
 
 		if readahead_time != 0 {
 			break
@@ -238,7 +246,7 @@ func (mvd *Mvd) ParseFrame() (error, bool) {
 	}
 
 	mvd.traceParseFrameStop()
-	return nil, mvd.done
+	return mvd.done, nil
 }
 
 func (mvd *Mvd) readFrame() error {

@@ -7,12 +7,12 @@ import (
 	"fmt"
 )
 
-func (mvd *Mvd) demotimeReadahead() (error, float64) {
+func (mvd *Mvd) demotimeReadahead() (float64, error) {
 	err, b := mvd.readByteAhead()
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
-	return nil, float64(b)
+	return float64(b), nil
 }
 
 func (mvd *Mvd) demotime() error {
