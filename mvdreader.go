@@ -274,7 +274,7 @@ func (mvd *Mvd) readFrame() error {
 			case dem_multiple:
 				{
 					mvd.traceAddReadTrace("dem_multiple")
-					err, i := mvd.readInt()
+					i, err := mvd.readInt()
 					if err != nil {
 						return err
 					}
@@ -335,7 +335,7 @@ func (mvd *Mvd) readFrame() error {
 			}
 
 			mvd.traceAddReadTrace("outgoing_sequence")
-			err, outgoing_sequence := mvd.readUint()
+			outgoing_sequence, err := mvd.readUint()
 			if err != nil {
 				return err
 			}
@@ -344,7 +344,7 @@ func (mvd *Mvd) readFrame() error {
 			mvd.demo.outgoing_sequence = outgoing_sequence
 
 			mvd.traceAddReadTrace("incoming_sequence")
-			err, incoming_sequence := mvd.readUint()
+			incoming_sequence, err := mvd.readUint()
 			if err != nil {
 				return err
 			}
@@ -357,7 +357,7 @@ func (mvd *Mvd) readFrame() error {
 			continue
 		}
 		if msg_type == dem_read {
-			err, b := mvd.readIt(msg_type)
+			b, err := mvd.readIt(msg_type)
 			if err != nil {
 				return err
 			}
@@ -365,7 +365,7 @@ func (mvd *Mvd) readFrame() error {
 				if mvd.debug != nil {
 					mvd.debug.Println("did we loop?")
 				}
-				err, b = mvd.readIt(msg_type)
+				b, err = mvd.readIt(msg_type)
 				if err != nil {
 					return err
 				}

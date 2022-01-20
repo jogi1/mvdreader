@@ -27,19 +27,19 @@ func (mvd *Mvd) emitEventSound(sound *Sound) {
 	mvd.State.SoundsActive = append(mvd.State.SoundsActive, *sound)
 }
 
-func (mvd *Mvd) messageParse(message Message) (error, bool) {
+func (mvd *Mvd) messageParse(message Message) (bool, error) {
 	message.mvd = mvd
 	for {
 		if mvd.done {
-			return nil, true
+			return true, nil
 		}
 
 		mvd.traceStartMessageTrace(&message)
 		mvd.traceStartMessageTraceReadTrace("type")
 
-		err, msgt := message.readByte()
+		msgt, err := message.readByte()
 		if err != nil {
-			return err, false
+			return false, err
 		}
 		msg_type := SVC_TYPE(msgt)
         fmt.Println(msg_type)
@@ -54,27 +54,27 @@ func (mvd *Mvd) messageParse(message Message) (error, bool) {
 		if m.IsValid() {
 			m.Call([]reflect.Value{reflect.ValueOf(mvd)})
 		} else {
-			return fmt.Errorf("error for message type: %#v %#v", msg_type, m), false
+			return false, fmt.Errorf("error for message type: %#v %#v", msg_type, m)
 		}
 		if message.offset >= message.size {
-			return nil, true
+			return true, nil
 		}
 
 		if mvd.done {
-			return nil, true
+			return true, nil
 		}
 	}
 	if message.offset != message.size {
-		return errors.New(fmt.Sprint("did not read message fully ", message.offset, message.size)), false
+		return false, errors.New(fmt.Sprint("did not read message fully ", message.offset, message.size))
 	}
-	return nil, true
+	return true, nil
 }
 
 func (message *Message) Svc_serverdata(mvd *Mvd) error {
 	var mrt *TraceRead
 	for {
 		message.traceAddMessageReadTrace("protocol")
-		err, prot := message.readLong()
+		prot, err := message.readLong()
 		if err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 
 		if protocol == protocol_fte2 {
 			message.traceAddMessageReadTrace("protocol_fte2")
-			err, fte_pext2 := message.readLong()
+			fte_pext2, err := message.readLong()
 			if err != nil {
 				return err
 			}
@@ -94,7 +94,7 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 			continue
 		} else if protocol == protocol_fte {
 			message.traceAddMessageReadTrace("protocol_fte")
-			err, fte_pext := message.readLong()
+			fte_pext, err := message.readLong()
 			if err != nil {
 				return err
 			}
@@ -102,7 +102,7 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 			continue
 		} else if protocol == protocol_mvd1 {
 			message.traceAddMessageReadTrace("protocol_mvd")
-			err, mvd_pext := message.readLong()
+			mvd_pext, err := message.readLong()
 			if err != nil {
 				return err
 			}
@@ -116,21 +116,21 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 	}
 
 	message.traceAddMessageReadTrace("server_count")
-	err, server_count := message.readLong() // server count
+	server_count, err := message.readLong() // server count
 	if err != nil {
 		return err
 	}
 	mvd.Server.ServerCount = server_count
 
 	message.traceAddMessageReadTrace("gamedir")
-	err, gamedir := message.readString() // gamedir
+	gamedir, err := message.readString() // gamedir
 	if err != nil {
 		return err
 	}
 	mvd.Server.Gamedir = gamedir
 
 	message.traceAddMessageReadTrace("demotime")
-	err, demotime := message.readFloat() // demotime
+	demotime, err := message.readFloat() // demotime
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -138,7 +138,7 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 	mvd.Server.Demotime = demotime
 
 	message.traceAddMessageReadTrace("map")
-	err, s := message.readString()
+	s, err := message.readString()
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 	for i := 0; i < 10; i++ {
 
 		message.traceAddMessageReadTrace(fmt.Sprintf("movevar_%d", i))
-		err, mv := message.readFloat()
+		mv, err := message.readFloat()
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -163,7 +163,7 @@ func (message *Message) Svc_bad(mvd *Mvd) {
 
 func (message *Message) Svc_cdtrack(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("track")
-	err, _ := message.readByte()
+	_, err := message.readByte()
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func (message *Message) Svc_cdtrack(mvd *Mvd) error {
 
 func (message *Message) Svc_stufftext(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("stufftext")
-	err, s := message.readString()
+	s, err := message.readString()
 	if err != nil {
 		return err
 	}
@@ -193,13 +193,13 @@ func (message *Message) Svc_stufftext(mvd *Mvd) error {
 
 func (message *Message) Svc_soundlist(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("index_start")
-	err, _ := message.readByte() // those are some indexes
+	_, err := message.readByte() // those are some indexes
 	if err != nil {
 		return err
 	}
 	for {
 		message.traceAddMessageReadTrace("name")
-		err, s := message.readString()
+		s, err := message.readString()
 		if err != nil {
 			return err
 		}
@@ -210,7 +210,7 @@ func (message *Message) Svc_soundlist(mvd *Mvd) error {
 	}
 
 	message.traceAddMessageReadTrace("offset")
-	err, _ = message.readByte() // some more indexes
+	_, err = message.readByte() // some more indexes
 
 	if err != nil {
 		return err
@@ -220,13 +220,13 @@ func (message *Message) Svc_soundlist(mvd *Mvd) error {
 
 func (message *Message) Svc_modellist(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("index_start")
-	err, _ := message.readByte() // those are some indexes
+	_, err := message.readByte() // those are some indexes
 	if err != nil {
 		return err
 	}
 	for {
 		message.traceAddMessageReadTrace("name")
-		err, s := message.readString()
+		s, err := message.readString()
 		if err != nil {
 			return err
 		}
@@ -236,7 +236,7 @@ func (message *Message) Svc_modellist(mvd *Mvd) error {
 		message.mvd.Server.Modellist = append(message.mvd.Server.Modellist, s)
 	}
 	message.traceAddMessageReadTrace("offset")
-	err, _ = message.readByte() // some more indexes
+	_, err = message.readByte() // some more indexes
 	if err != nil {
 		return err
 	}
@@ -245,7 +245,7 @@ func (message *Message) Svc_modellist(mvd *Mvd) error {
 
 func (message *Message) Svc_spawnbaseline(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("index")
-	err, index := message.readShort()
+	index, err := message.readShort()
 	if err != nil {
 		return err
 	}
@@ -262,12 +262,12 @@ func (message *Message) Svc_spawnbaseline(mvd *Mvd) error {
 
 func (message *Message) Svc_updatefrags(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("pnum")
-	err, player := message.readByte()
+	player, err := message.readByte()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("frags")
-	err, frags := message.readShort()
+	frags, err := message.readShort()
 	if err != nil {
 		return err
 	}
@@ -279,21 +279,21 @@ func (message *Message) Svc_updatefrags(mvd *Mvd) error {
 func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 	var pe_type PE_TYPE
 	message.traceAddMessageReadTrace("pnum")
-	err, pnum := message.readByte()
+	pnum, err := message.readByte()
 	if err != nil {
 		return err
 	}
 	p := &mvd.State.Players[pnum]
 
 	message.traceAddMessageReadTrace("flags")
-	err, sflags := message.readShort()
+	sflags, err := message.readShort()
 	if err != nil {
 		return err
 	}
 	flags := DF_TYPE(sflags)
 
 	message.traceAddMessageReadTrace("frame")
-	err, frame := message.readByte()
+	frame, err := message.readByte()
 	p.Frame = int(frame)
 	if err != nil {
 		return err
@@ -308,7 +308,7 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 			case 0:
 				{
 					message.traceAddMessageReadTrace("Origin.X")
-					err, coord := message.readCoord()
+					coord, err := message.readCoord()
 					if err != nil {
 						return err
 					}
@@ -317,7 +317,7 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 			case 1:
 				{
 					message.traceAddMessageReadTrace("Origin.Y")
-					err, coord := message.readCoord()
+					coord, err := message.readCoord()
 					if err != nil {
 						return err
 					}
@@ -326,7 +326,7 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 			case 2:
 				{
 					message.traceAddMessageReadTrace("Origin.Z")
-					err, coord := message.readCoord()
+					coord, err := message.readCoord()
 					if err != nil {
 						return err
 					}
@@ -344,7 +344,7 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 			case 0:
 				{
 					message.traceAddMessageReadTrace("Angle.X")
-					err, angle := message.readAngle16()
+					angle, err := message.readAngle16()
 					if err != nil {
 						return err
 					}
@@ -353,7 +353,7 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 			case 1:
 				{
 					message.traceAddMessageReadTrace("Angle.Y")
-					err, angle := message.readAngle16()
+					angle, err := message.readAngle16()
 					if err != nil {
 						return err
 					}
@@ -362,7 +362,7 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 			case 2:
 				{
 					message.traceAddMessageReadTrace("Angle.Z")
-					err, angle := message.readAngle16()
+					angle, err := message.readAngle16()
 					if err != nil {
 						return err
 					}
@@ -378,7 +378,7 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 		pe_type |= PE_ANIMATION
 
 		message.traceAddMessageReadTrace("model")
-		err, mindex := message.readByte()
+		mindex, err := message.readByte()
 		if err != nil {
 			return err
 		}
@@ -388,7 +388,7 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 	if flags&DF_SKINNUM == DF_SKINNUM {
 		pe_type |= PE_ANIMATION
 		message.traceAddMessageReadTrace("skinnum")
-		err, skinnum := message.readByte()
+		skinnum, err := message.readByte()
 		if err != nil {
 			return err
 		}
@@ -398,7 +398,7 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 	if flags&DF_EFFECTS == DF_EFFECTS {
 		pe_type |= PE_ANIMATION
 		message.traceAddMessageReadTrace("effects")
-		err, effects := message.readByte()
+		effects, err := message.readByte()
 		if err != nil {
 			return err
 		}
@@ -409,7 +409,7 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 		pe_type |= PE_ANIMATION
 
 		message.traceAddMessageReadTrace("weaponframe")
-		err, weaponframe := message.readByte()
+		weaponframe, err := message.readByte()
 		if err != nil {
 			return err
 		}
@@ -425,14 +425,14 @@ func (message *Message) Svc_playerinfo(mvd *Mvd) error {
 
 func (message *Message) Svc_updateping(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("pnum")
-	err, pnum := message.readByte()
+	pnum, err := message.readByte()
 	if err != nil {
 		return err
 	}
 	p := &mvd.State.Players[pnum]
 
 	message.traceAddMessageReadTrace("ping")
-	err, ping := message.readShort()
+	ping, err := message.readShort()
 	if err != nil {
 		return err
 	}
@@ -443,14 +443,14 @@ func (message *Message) Svc_updateping(mvd *Mvd) error {
 
 func (message *Message) Svc_updatepl(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("pnum")
-	err, pnum := message.readByte()
+	pnum, err := message.readByte()
 	if err != nil {
 		return err
 	}
 	p := &mvd.State.Players[pnum]
 
 	message.traceAddMessageReadTrace("pl")
-	err, pl := message.readByte()
+	pl, err := message.readByte()
 	if err != nil {
 		return err
 	}
@@ -462,14 +462,14 @@ func (message *Message) Svc_updatepl(mvd *Mvd) error {
 func (message *Message) Svc_updateentertime(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("pnum")
 
-	err, pnum := message.readByte()
+	pnum, err := message.readByte()
 	if err != nil {
 		return err
 	}
 	p := &mvd.State.Players[pnum]
 
 	message.traceAddMessageReadTrace("entertime")
-	err, entertime := message.readFloat()
+	entertime, err := message.readFloat()
 	if err != nil {
 		return err
 	}
@@ -480,13 +480,13 @@ func (message *Message) Svc_updateentertime(mvd *Mvd) error {
 
 func (message *Message) Svc_updateuserinfo(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("pnum")
-	err, pnum := message.readByte()
+	pnum, err := message.readByte()
 	if err != nil {
 		return err
 	}
 
 	message.traceAddMessageReadTrace("uid")
-	err, uid := message.readLong()
+	uid, err := message.readLong()
 	if err != nil {
 		return err
 	}
@@ -494,7 +494,7 @@ func (message *Message) Svc_updateuserinfo(mvd *Mvd) error {
 	p.Userid = uid
 
 	message.traceAddMessageReadTrace("userinfo")
-	err, ui := message.readString()
+	ui, err := message.readString()
 	if err != nil {
 		return err
 	}
@@ -527,7 +527,7 @@ func (message *Message) Svc_updateuserinfo(mvd *Mvd) error {
 func (message *Message) Svc_sound(mvd *Mvd) error {
 	var s Sound
 	message.traceAddMessageReadTrace("channel")
-	err, sc := message.readShort()
+	sc, err := message.readShort()
 	if err != nil {
 		return err
 	}
@@ -535,7 +535,7 @@ func (message *Message) Svc_sound(mvd *Mvd) error {
 	s.Channel = channel
 	if channel&SND_VOLUME == SND_VOLUME {
 		message.traceAddMessageReadTrace("volume")
-		err, volume := message.readByte()
+		volume, err := message.readByte()
 		if err != nil {
 			return err
 		}
@@ -544,7 +544,7 @@ func (message *Message) Svc_sound(mvd *Mvd) error {
 
 	if channel&SND_ATTENUATION == SND_ATTENUATION {
 		message.traceAddMessageReadTrace("attenuation")
-		err, attenuation := message.readByte()
+		attenuation, err := message.readByte()
 		if err != nil {
 			return err
 		}
@@ -554,24 +554,24 @@ func (message *Message) Svc_sound(mvd *Mvd) error {
 	message.traceMessageReadAdditionlInfo("ent", ent)
 	message.traceMessageReadAdditionlInfo("actual channel", s.Channel&7)
 	message.traceAddMessageReadTrace("index")
-	err, index := message.readByte()
+	index, err := message.readByte()
 	if err != nil {
 		return err
 	}
 	s.Index = index // sound_num
 
 	message.traceAddMessageReadTrace("Origin.X")
-	err, x := message.readCoord()
+	x, err := message.readCoord()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Origin.Y")
-	err, y := message.readCoord()
+	y, err := message.readCoord()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Origin.Z")
-	err, z := message.readCoord()
+	z, err := message.readCoord()
 	if err != nil {
 		return err
 	}
@@ -583,37 +583,37 @@ func (message *Message) Svc_sound(mvd *Mvd) error {
 func (message *Message) Svc_spawnstaticsound(mvd *Mvd) error {
 	var s Sound
 	message.traceAddMessageReadTrace("Origin.X")
-	err, x := message.readCoord()
+	x, err := message.readCoord()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Origin.Y")
-	err, y := message.readCoord()
+	y, err := message.readCoord()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Origin.Z")
-	err, z := message.readCoord()
+	z, err := message.readCoord()
 	if err != nil {
 		return err
 	}
 	s.Origin.Set(x, y, z)
 
 	message.traceAddMessageReadTrace("index")
-	err, index := message.readByte()
+	index, err := message.readByte()
 	if err != nil {
 		return err
 	}
 	s.Index = index // sound_num
 
 	message.traceAddMessageReadTrace("volume")
-	err, volume := message.readByte()
+	volume, err := message.readByte()
 	if err != nil {
 		return err
 	}
 	s.Volume = volume // sound volume
 	message.traceAddMessageReadTrace("attenuation")
-	err, attenuation := message.readByte()
+	attenuation, err := message.readByte()
 	if err != nil {
 		return err
 	}
@@ -624,22 +624,22 @@ func (message *Message) Svc_spawnstaticsound(mvd *Mvd) error {
 
 func (message *Message) Svc_setangle(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("index")
-	err, _ := message.readByte() // something weird?
+	_, err := message.readByte() // something weird?
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Angle.X")
-	err, _ = message.readAngle() // x
+	_, err = message.readAngle() // x
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Angle.Y")
-	err, _ = message.readAngle()
+	_, err = message.readAngle()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Angle.Z")
-	err, _ = message.readAngle()
+	_, err = message.readAngle()
 	if err != nil {
 		return err
 	}
@@ -648,12 +648,12 @@ func (message *Message) Svc_setangle(mvd *Mvd) error {
 
 func (message *Message) Svc_lightstyle(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("index")
-	err, _ := message.readByte() // lightstyle num
+	_, err := message.readByte() // lightstyle num
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("style")
-	err, _ = message.readString()
+	_, err = message.readString()
 	if err != nil {
 		return err
 	}
@@ -662,18 +662,18 @@ func (message *Message) Svc_lightstyle(mvd *Mvd) error {
 
 func (message *Message) Svc_updatestatlong(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("stat")
-	err, b := message.readByte()
+	b, err := message.readByte()
 	if err != nil {
 		return err
 	}
 	stat := STAT_TYPE(b)
 	message.traceAddMessageReadTrace("value")
-	err, value := message.readLong()
+	value, err := message.readLong()
 	if err != nil {
 		return err
 	}
 	p := &mvd.State.Players[mvd.demo.last_to]
-	s := fmt.Sprintf("%s", STAT_TYPE(stat))
+	s := STAT_TYPE(stat).String()
 	s = strings.TrimPrefix(s, "STAT_")
 	s = strings.ToLower(s)
 	s = strings.Title(s)
@@ -693,14 +693,14 @@ func (message *Message) Svc_updatestatlong(mvd *Mvd) error {
 
 func (message *Message) Svc_updatestat(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("stat")
-	err, b := message.readByte()
+	b, err := message.readByte()
 	if err != nil {
 		return err
 	}
 	stat := STAT_TYPE(b)
 
 	message.traceAddMessageReadTrace("value")
-	err, value := message.readByte()
+	value, err := message.readByte()
 	if err != nil {
 		return err
 	}
@@ -731,14 +731,14 @@ func (message *Message) ParseDelta(mvd *Mvd, from, to *Entity) error {
 
 func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("from")
-	err, _ := message.readByte()
+	_, err := message.readByte()
 	if err != nil {
 		return err
 	}
 
 	for {
 		message.traceAddMessageReadTrace("flags")
-		err, w := message.readShort()
+		w, err := message.readShort()
 		if err != nil {
 			return err
 		}
@@ -768,7 +768,7 @@ func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 		message.traceMessageReadAdditionlInfo("morebits", U_MOREBITS)
 		if bits&U_MOREBITS == U_MOREBITS {
 			message.traceAddMessageReadTrace("morebits")
-			err, i := message.readByte()
+			i, err := message.readByte()
 			if err != nil {
 				return err
 			}
@@ -777,13 +777,13 @@ func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 
 		morebits := 0
 		if bits&U_FTE_EVENVENMORE == U_FTE_EVENVENMORE {
-			err, i := message.readByte()
+			i, err := message.readByte()
 			if err != nil {
 				return err
 			}
 			morebits = int(i)
 			if morebits&U_FTE_YETMORE == U_FTE_YETMORE {
-				err, mi := message.readByte()
+				mi, err := message.readByte()
 				if err != nil {
 					return err
 				}
@@ -794,12 +794,12 @@ func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 
 		if bits&U_MOREBITS == U_MOREBITS {
 			if mvd.demo.fte_pext&FTE_PEXT_ENTITYDBL == FTE_PEXT_ENTITYDBL {
-				err, evenMore := message.peekByte(0)
+				evenMore, err := message.peekByte(0)
 				if err != nil {
 					return err
 				}
 				if evenMore&U_FTE_EVENVENMORE == U_FTE_EVENVENMORE {
-					err, evenMore = message.peekByte(1)
+					evenMore, err = message.peekByte(1)
 					if err != nil {
 						return err
 					}
@@ -817,12 +817,12 @@ func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 			message.traceMessageReadAdditionlInfo("entity removed", "")
 			if mvd.demo.fte_pext&FTE_PEXT_ENTITYDBL == FTE_PEXT_ENTITYDBL && bits&U_MOREBITS == U_MOREBITS {
 				message.traceAddMessageReadTrace("fte extension")
-				err, ftext := message.readByte()
+				ftext, err := message.readByte()
 				if err != nil {
 					return err
 				}
 				if ftext&U_FTE_EVENVENMORE == U_FTE_EVENVENMORE {
-					err, _ := message.readByte()
+					_, err := message.readByte()
 					if err != nil {
 						return err
 					}
@@ -831,77 +831,77 @@ func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 		}
 		if bits&U_MODEL == U_MODEL {
 			message.traceAddMessageReadTrace("model")
-			err, entity.ModelIndex = message.readByte()
+			entity.ModelIndex, err = message.readByte()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_FRAME == U_FRAME {
 			message.traceAddMessageReadTrace("frame")
-			err, entity.Frame = message.readByte()
+			entity.Frame, err = message.readByte()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_COLORMAP == U_COLORMAP {
 			message.traceAddMessageReadTrace("colormap")
-			err, entity.ColorMap = message.readByte()
+			entity.ColorMap, err = message.readByte()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_SKIN == U_SKIN {
 			message.traceAddMessageReadTrace("skin")
-			err, entity.SkinNum = message.readByte()
+			entity.SkinNum, err = message.readByte()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_EFFECTS == U_EFFECTS {
 			message.traceAddMessageReadTrace("effects")
-			err, entity.Effects = message.readByte()
+			entity.Effects, err = message.readByte()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_ORIGIN1 == U_ORIGIN1 {
 			message.traceAddMessageReadTrace("Origin.X")
-			err, entity.Origin.X = message.readCoord()
+			entity.Origin.X, err = message.readCoord()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_ANGLE1 == U_ANGLE1 {
 			message.traceAddMessageReadTrace("Angle.X")
-			err, entity.Angle.X = message.readAngle()
+			entity.Angle.X, err = message.readAngle()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_ORIGIN2 == U_ORIGIN2 {
 			message.traceAddMessageReadTrace("Origin.Y")
-			err, entity.Origin.Y = message.readCoord()
+			entity.Origin.Y, err = message.readCoord()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_ANGLE2 == U_ANGLE2 {
 			message.traceAddMessageReadTrace("Angle.Y")
-			err, entity.Angle.Y = message.readAngle()
+			entity.Angle.Y, err = message.readAngle()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_ORIGIN3 == U_ORIGIN3 {
 			message.traceAddMessageReadTrace("Origin.Z")
-			err, entity.Origin.Z = message.readCoord()
+			entity.Origin.Z, err = message.readCoord()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_ANGLE3 == U_ANGLE3 {
 			message.traceAddMessageReadTrace("Angle.Z")
-			err, entity.Angle.Z = message.readAngle()
+			entity.Angle.Z, err = message.readAngle()
 			if err != nil {
 				return err
 			}
@@ -925,7 +925,7 @@ func (message *Message) Svc_deltapacketentities(mvd *Mvd) error {
 
 		// FIXME: do all the other fte stuff
 		if morebits&U_FTE_TRANS == U_FTE_TRANS {
-			err, b := message.readByte()
+			b, err := message.readByte()
 			if err != nil {
 				return err
 			}
@@ -942,7 +942,7 @@ func (message *Message) Svc_packetentities(mvd *Mvd) error {
 		message.traceMessageReadAdditionlInfo("entity start:", count)
 		count++
 		message.traceAddMessageReadTrace("bits")
-		err, w := message.readShort()
+		w, err := message.readShort()
 		if err != nil {
 			return err
 		}
@@ -973,7 +973,7 @@ func (message *Message) Svc_packetentities(mvd *Mvd) error {
 
 		if bits&U_MOREBITS == U_MOREBITS {
 			message.traceAddMessageReadTrace("morebits")
-			err, i := message.readByte()
+			i, err := message.readByte()
 			if err != nil {
 				return err
 			}
@@ -986,7 +986,7 @@ func (message *Message) Svc_packetentities(mvd *Mvd) error {
 
 		if bits&U_MODEL == U_MODEL {
 			message.traceAddMessageReadTrace("model")
-			err, entity.ModelIndex = message.readByte()
+			entity.ModelIndex, err = message.readByte()
 			if err != nil {
 				return err
 			}
@@ -994,21 +994,21 @@ func (message *Message) Svc_packetentities(mvd *Mvd) error {
 		}
 		if bits&U_FRAME == U_FRAME {
 			message.traceAddMessageReadTrace("frame")
-			err, entity.Frame = message.readByte()
+			entity.Frame, err = message.readByte()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_COLORMAP == U_COLORMAP {
 			message.traceAddMessageReadTrace("colormap")
-			err, entity.ColorMap = message.readByte()
+			entity.ColorMap, err = message.readByte()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_SKIN == U_SKIN {
 			message.traceAddMessageReadTrace("skin")
-			err, b := message.readByte()
+			b, err := message.readByte()
 			if err != nil {
 				return err
 			}
@@ -1016,7 +1016,7 @@ func (message *Message) Svc_packetentities(mvd *Mvd) error {
 		}
 		if bits&U_EFFECTS == U_EFFECTS {
 			message.traceAddMessageReadTrace("effect")
-			err, b := message.readByte()
+			b, err := message.readByte()
 			if err != nil {
 				return err
 			}
@@ -1024,42 +1024,42 @@ func (message *Message) Svc_packetentities(mvd *Mvd) error {
 		}
 		if bits&U_ORIGIN1 == U_ORIGIN1 {
 			message.traceAddMessageReadTrace("Origin.X")
-			err, entity.Origin.X = message.readCoord()
+			entity.Origin.X, err = message.readCoord()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_ANGLE1 == U_ANGLE1 {
 			message.traceAddMessageReadTrace("Angle.X")
-			err, entity.Angle.X = message.readAngle()
+			entity.Angle.X, err = message.readAngle()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_ORIGIN2 == U_ORIGIN2 {
 			message.traceAddMessageReadTrace("Origin.Y")
-			err, entity.Origin.Y = message.readCoord()
+			entity.Origin.Y, err = message.readCoord()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_ANGLE2 == U_ANGLE2 {
 			message.traceAddMessageReadTrace("Angle.Y")
-			err, entity.Angle.Y = message.readAngle()
+			entity.Angle.Y, err = message.readAngle()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_ORIGIN3 == U_ORIGIN3 {
 			message.traceAddMessageReadTrace("Origin.Z")
-			err, entity.Origin.Z = message.readCoord()
+			entity.Origin.Z, err = message.readCoord()
 			if err != nil {
 				return err
 			}
 		}
 		if bits&U_ANGLE3 == U_ANGLE3 {
 			message.traceAddMessageReadTrace("Angle.Z")
-			err, entity.Angle.Z = message.readAngle()
+			entity.Angle.Z, err = message.readAngle()
 			if err != nil {
 				return err
 			}
@@ -1072,7 +1072,7 @@ func (message *Message) Svc_packetentities(mvd *Mvd) error {
 func (message *Message) Svc_temp_entity(mvd *Mvd) error {
 	entity := new(Tempentity)
 	message.traceAddMessageReadTrace("flags")
-	err, b := message.readByte()
+	b, err := message.readByte()
 	if err != nil {
 		return err
 	}
@@ -1082,7 +1082,7 @@ func (message *Message) Svc_temp_entity(mvd *Mvd) error {
 
 	if t == TE_GUNSHOT || t == TE_BLOOD {
 		message.traceAddMessageReadTrace("count")
-		err, entity.Count = message.readByteAsInt()
+		entity.Count, err = message.readByteAsInt()
 		if err != nil {
 			return err
 		}
@@ -1090,39 +1090,39 @@ func (message *Message) Svc_temp_entity(mvd *Mvd) error {
 
 	if t == TE_LIGHTNING1 || t == TE_LIGHTNING2 || t == TE_LIGHTNING3 {
 		message.traceAddMessageReadTrace("beam-entity")
-		err, entity.Entity = message.readShort()
+		entity.Entity, err = message.readShort()
 		if err != nil {
 			return err
 		}
 		message.traceAddMessageReadTrace("beam-Start.X")
-		err, entity.Start.X = message.readCoord()
+		entity.Start.X, err = message.readCoord()
 		if err != nil {
 			return err
 		}
 		message.traceAddMessageReadTrace("beam-Start.Y")
-		err, entity.Start.Y = message.readCoord()
+		entity.Start.Y, err = message.readCoord()
 		if err != nil {
 			return err
 		}
 		message.traceAddMessageReadTrace("beam-Start.Z")
-		err, entity.Start.Z = message.readCoord()
+		entity.Start.Z, err = message.readCoord()
 		if err != nil {
 			return err
 		}
 	}
 
 	message.traceAddMessageReadTrace("Origin.X")
-	err, entity.Origin.X = message.readCoord()
+	entity.Origin.X, err = message.readCoord()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Origin.Y")
-	err, entity.Origin.Y = message.readCoord()
+	entity.Origin.Y, err = message.readCoord()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Origin.Z")
-	err, entity.Origin.Z = message.readCoord()
+	entity.Origin.Z, err = message.readCoord()
 	if err != nil {
 		return err
 	}
@@ -1133,13 +1133,13 @@ func (message *Message) Svc_temp_entity(mvd *Mvd) error {
 
 func (message *Message) Svc_print(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("from")
-	err, from := message.readByte()
+	from, err := message.readByte()
 	if err != nil {
 		return err
 	}
 
 	message.traceAddMessageReadTrace("message")
-	err, s := message.readString()
+	s, err := message.readString()
 	if err != nil {
 		return err
 	}
@@ -1149,12 +1149,12 @@ func (message *Message) Svc_print(mvd *Mvd) error {
 
 func (message *Message) Svc_serverinfo(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("key")
-	err, key := message.readString()
+	key, err := message.readString()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("value")
-	err, value := message.readString()
+	value, err := message.readString()
 	if err != nil {
 		return err
 	}
@@ -1171,7 +1171,7 @@ func mvdPrint(s ...interface{}) {
 
 func (message *Message) Svc_centerprint(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("message")
-	err, s := message.readString()
+	s, err := message.readString()
 	if err != nil {
 		return err
 	}
@@ -1181,18 +1181,18 @@ func (message *Message) Svc_centerprint(mvd *Mvd) error {
 
 func (message *Message) Svc_setinfo(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("pnum")
-	err, pnum := message.readByte() // num
+	pnum, err := message.readByte() // num
 	if err != nil {
 		return err
 	}
 
 	message.traceAddMessageReadTrace("key")
-	err, key := message.readString() // key
+	key, err := message.readString() // key
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("value")
-	err, value := message.readString() // value
+	value, err := message.readString() // value
 	if err != nil {
 		return err
 	}
@@ -1203,27 +1203,27 @@ func (message *Message) Svc_setinfo(mvd *Mvd) error {
 
 func (message *Message) Svc_damage(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("armor")
-	err, _ := message.readByte() // armor
+	_, err := message.readByte() // armor
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("blood")
-	err, _ = message.readByte() // blood
+	_, err = message.readByte() // blood
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Origin.X")
-	err, _ = message.readCoord()
+	_, err = message.readCoord()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Origin.Y")
-	err, _ = message.readCoord()
+	_, err = message.readCoord()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Origin.Z")
-	err, _ = message.readCoord()
+	_, err = message.readCoord()
 	if err != nil {
 		return err
 	}
@@ -1232,7 +1232,7 @@ func (message *Message) Svc_damage(mvd *Mvd) error {
 
 func (message *Message) Svc_chokecount(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("chokecount")
-	err, _ := message.readByte()
+	_, err := message.readByte()
 	if err != nil {
 		return err
 	}
@@ -1243,52 +1243,52 @@ func (message *Message) parseBaseline(mvd *Mvd) (*Entity, error) {
 	var err error
 	entity := new(Entity)
 	message.traceAddMessageReadTrace("entity-ModelIndex")
-	err, entity.ModelIndex = message.readByte()
+	entity.ModelIndex, err = message.readByte()
 	if err != nil {
 		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-ModelFrame")
-	err, entity.Frame = message.readByte()
+	entity.Frame, err = message.readByte()
 	if err != nil {
 		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-ColorMap")
-	err, entity.ColorMap = message.readByte()
+	entity.ColorMap, err = message.readByte()
 	if err != nil {
 		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-SkinNum")
-	err, entity.SkinNum = message.readByte()
+	entity.SkinNum, err = message.readByte()
 	if err != nil {
 		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Origin.X")
-	err, entity.Origin.X = message.readCoord()
+	entity.Origin.X, err = message.readCoord()
 	if err != nil {
 		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Angle.X")
-	err, entity.Angle.X = message.readAngle()
+	entity.Angle.X, err = message.readAngle()
 	if err != nil {
 		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Origin.Y")
-	err, entity.Origin.Y = message.readCoord()
+	entity.Origin.Y, err = message.readCoord()
 	if err != nil {
 		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Angle.Y")
-	err, entity.Angle.Y = message.readAngle()
+	entity.Angle.Y, err = message.readAngle()
 	if err != nil {
 		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Origin.Z")
-	err, entity.Origin.Z = message.readCoord()
+	entity.Origin.Z, err = message.readCoord()
 	if err != nil {
 		return nil, err
 	}
 	message.traceAddMessageReadTrace("entity-Angle.Z")
-	err, entity.Angle.Z = message.readAngle()
+	entity.Angle.Z, err = message.readAngle()
 	if err != nil {
 		return nil, err
 	}
@@ -1318,7 +1318,7 @@ func (message *Message) Svc_bigkick(mvd *Mvd) error {
 
 func (message *Message) Svc_muzzleflash(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("no_idea")
-	err, _ := message.readShort()
+	_, err := message.readShort()
 	if err != nil {
 		return err
 	}
@@ -1327,32 +1327,32 @@ func (message *Message) Svc_muzzleflash(mvd *Mvd) error {
 
 func (message *Message) Svc_intermission(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("Origin.X")
-	err, _ := message.readCoord()
+	_, err := message.readCoord()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Origin.Y")
-	err, _ = message.readCoord()
+	_, err = message.readCoord()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Origin.Z")
-	err, _ = message.readCoord()
+	_, err = message.readCoord()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Angle.X")
-	err, _ = message.readAngle()
+	_, err = message.readAngle()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Angle.Y")
-	err, _ = message.readAngle()
+	_, err = message.readAngle()
 	if err != nil {
 		return err
 	}
 	message.traceAddMessageReadTrace("Angle.Z")
-	err, _ = message.readAngle()
+	_, err = message.readAngle()
 	if err != nil {
 		return err
 	}
@@ -1365,7 +1365,7 @@ func (message *Message) Svc_disconnect(mvd *Mvd) error {
 }
 
 func (message *Message) Svc_setpause(mvd *Mvd) error {
-	err, _ := message.readByte()
+	_, err := message.readByte()
 	if err != nil {
 		return err
 	}
@@ -1379,13 +1379,13 @@ func (message *Message) Svc_foundsecret(mvd *Mvd) error {
 
 func (message *Message) Svc_fte_modellistshort(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("index_start")
-	err, _ := message.readShort() // those are some indexes
+	_, err := message.readShort() // those are some indexes
 	if err != nil {
 		return err
 	}
 	for {
 		message.traceAddMessageReadTrace("name")
-		err, s := message.readString()
+		s, err := message.readString()
 		if err != nil {
 			return err
 		}
@@ -1395,7 +1395,7 @@ func (message *Message) Svc_fte_modellistshort(mvd *Mvd) error {
 		message.mvd.Server.Modellist = append(message.mvd.Server.Modellist, s)
 	}
 	message.traceAddMessageReadTrace("offset")
-	err, _ = message.readByte() // some more indexes
+	_, err = message.readByte() // some more indexes
 	if err != nil {
 		return err
 	}
@@ -1404,7 +1404,7 @@ func (message *Message) Svc_fte_modellistshort(mvd *Mvd) error {
 
 func (message *Message) Svc_fte_spawnbaseline2(mvd *Mvd) error {
 	message.traceAddMessageReadTrace("index")
-	err, bits := message.readShort()
+	bits, err := message.readShort()
 	message.traceMessageReadAdditionlInfo("num", bits&511)
 	entNum := bits & 511
 	if err != nil {
@@ -1415,8 +1415,7 @@ func (message *Message) Svc_fte_spawnbaseline2(mvd *Mvd) error {
 	if bits&U_MOREBITS == U_MOREBITS {
 		message.traceAddMessageReadTrace("morebits")
 		message.traceMessageReadAdditionlInfo("morebits happaned?", "?")
-		err, i := message.readByte()
-
+		i, err := message.readByte()
 		if err != nil {
 			return err
 		}
@@ -1425,13 +1424,13 @@ func (message *Message) Svc_fte_spawnbaseline2(mvd *Mvd) error {
 
 	morebits := 0
 	if bits&U_FTE_EVENVENMORE == U_FTE_EVENVENMORE {
-		err, i := message.readByte()
+		i, err := message.readByte()
 		if err != nil {
 			return err
 		}
 		morebits = int(i)
 		if morebits&U_FTE_YETMORE == U_FTE_YETMORE {
-			err, mi := message.readByte()
+			mi, err := message.readByte()
 			if err != nil {
 				return err
 			}
@@ -1445,83 +1444,83 @@ func (message *Message) Svc_fte_spawnbaseline2(mvd *Mvd) error {
 
 	if bits&U_MODEL == U_MODEL {
 		message.traceAddMessageReadTrace("model")
-		err, entity.ModelIndex = message.readByte()
+		entity.ModelIndex, err = message.readByte()
 		if err != nil {
 			return err
 		}
 	}
 	if bits&U_FRAME == U_FRAME {
 		message.traceAddMessageReadTrace("frame")
-		err, entity.Frame = message.readByte()
+		entity.Frame, err = message.readByte()
 		if err != nil {
 			return err
 		}
 	}
 	if bits&U_COLORMAP == U_COLORMAP {
 		message.traceAddMessageReadTrace("colormap")
-		err, entity.ColorMap = message.readByte()
+		entity.ColorMap, err = message.readByte()
 		if err != nil {
 			return err
 		}
 	}
 	if bits&U_SKIN == U_SKIN {
 		message.traceAddMessageReadTrace("skin")
-		err, entity.SkinNum = message.readByte()
+		entity.SkinNum, err = message.readByte()
 		if err != nil {
 			return err
 		}
 	}
 	if bits&U_EFFECTS == U_EFFECTS {
 		message.traceAddMessageReadTrace("effects")
-		err, entity.Effects = message.readByte()
+		entity.Effects, err = message.readByte()
 		if err != nil {
 			return err
 		}
 	}
 	if bits&U_ORIGIN1 == U_ORIGIN1 {
 		message.traceAddMessageReadTrace("Origin.X")
-		err, entity.Origin.X = message.readCoord()
+		entity.Origin.X, err = message.readCoord()
 		if err != nil {
 			return err
 		}
 	}
 	if bits&U_ANGLE1 == U_ANGLE1 {
 		message.traceAddMessageReadTrace("Angle.X")
-		err, entity.Angle.X = message.readAngle()
+		entity.Angle.X, err = message.readAngle()
 		if err != nil {
 			return err
 		}
 	}
 	if bits&U_ORIGIN2 == U_ORIGIN2 {
 		message.traceAddMessageReadTrace("Origin.Y")
-		err, entity.Origin.Y = message.readCoord()
+		entity.Origin.Y, err = message.readCoord()
 		if err != nil {
 			return err
 		}
 	}
 	if bits&U_ANGLE2 == U_ANGLE2 {
 		message.traceAddMessageReadTrace("Angle.Y")
-		err, entity.Angle.Y = message.readAngle()
+		entity.Angle.Y, err = message.readAngle()
 		if err != nil {
 			return err
 		}
 	}
 	if bits&U_ORIGIN3 == U_ORIGIN3 {
 		message.traceAddMessageReadTrace("Origin.Z")
-		err, entity.Origin.Z = message.readCoord()
+		entity.Origin.Z, err = message.readCoord()
 		if err != nil {
 			return err
 		}
 	}
 	if bits&U_ANGLE3 == U_ANGLE3 {
 		message.traceAddMessageReadTrace("Angle.Z")
-		err, entity.Angle.Z = message.readAngle()
+		entity.Angle.Z, err = message.readAngle()
 		if err != nil {
 			return err
 		}
 	}
 	if morebits&U_FTE_TRANS == U_FTE_TRANS {
-		err, t := message.readByte()
+		t, err := message.readByte()
 		if err != nil {
 			return err
 		}
@@ -1539,81 +1538,81 @@ func (message *Message) Svc_fte_spawnbaseline2(mvd *Mvd) error {
 
 // FIXME: this should never happen
 func (message *Message) Svc_setview(mvd *Mvd) error {
-	err, _ := message.readShort()
+	_, err := message.readShort()
 	return err
 }
 
-func (message *Message) readBytes(count uint) (error, *bytes.Buffer) {
+func (message *Message) readBytes(count uint) (*bytes.Buffer, error) {
 	message.traceStartMessageReadTrace("readBytes", &message.offset, nil, nil)
 	if message.offset+count > message.size {
-		return errors.New("reading beyond message length"), nil
+		return nil, errors.New("reading beyond message length")
 	}
 	b := bytes.NewBuffer(message.mvd.file[message.OffsetStart+message.offset : message.OffsetStart+message.offset+count])
 	message.offset += count
 	message.traceStartMessageReadTrace("readBytes", nil, &message.offset, b)
-	return nil, b
+	return b, nil
 }
 
-func (message *Message) readByte() (error, byte) {
+func (message *Message) readByte() (byte, error) {
 	var b byte
 	message.traceStartMessageReadTrace("readByte", &message.offset, nil, nil)
-	err, barray := message.readBytes(1)
+	barray, err := message.readBytes(1)
 	if err != nil {
-		return err, byte(0)
+		return byte(0), err
 	}
 	err = binary.Read(barray, binary.BigEndian, &b)
 	if err != nil {
-		return err, byte(0)
+		return byte(0), err
 	}
 	message.traceStartMessageReadTrace("readByte", nil, &message.offset, b)
-	return nil, b
+	return b, nil
 }
 
-func (message *Message) readByteAsInt() (error, int) {
+func (message *Message) readByteAsInt() (int, error) {
 	message.traceStartMessageReadTrace("readByteAsInt", &message.offset, nil, nil)
-	err, b := message.readByte()
+	b, err := message.readByte()
 	message.traceStartMessageReadTrace("readByteAsInt", nil, &message.offset, int(b))
-	return err, int(b)
+	return int(b), err
 }
 
-func (message *Message) readLong() (error, int) {
+func (message *Message) readLong() (int, error) {
 	var i int32
 	message.traceStartMessageReadTrace("readLong", &message.offset, nil, nil)
-	err, b := message.readBytes(4)
+	b, err := message.readBytes(4)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	err = binary.Read(b, binary.LittleEndian, &i)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	message.traceStartMessageReadTrace("readLong", nil, &message.offset, i)
-	return nil, int(i)
+	return int(i), nil
 }
 
-func (message *Message) readFloat() (error, float32) {
+func (message *Message) readFloat() (float32, error) {
 	var i float32
 	message.traceStartMessageReadTrace("readFloat", &message.offset, nil, nil)
-	err, b := message.readBytes(4)
+	b, err := message.readBytes(4)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	err = binary.Read(b, binary.LittleEndian, &i)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	message.traceStartMessageReadTrace("readFloat", nil, &message.offset, float32(i))
-	return nil, float32(i)
+	return float32(i), nil
 }
 
-func (message *Message) readString() (error, string) {
+func (message *Message) readString() (string, error) {
 	b := make([]byte, 0)
 	message.traceStartMessageReadTrace("readString", &message.offset, nil, nil)
 	for {
-		err, c := message.readByte()
+		c, err := message.readByte()
 		if err != nil {
-			return err, ""
+			return "", err
 		}
 		if c == 255 {
 			continue
@@ -1625,103 +1624,103 @@ func (message *Message) readString() (error, string) {
 	}
 
 	message.traceStartMessageReadTrace("readString", nil, &message.offset, string(b))
-	return nil, string(b)
+	return string(b), nil
 }
 
-func (message *Message) readCoord() (error, float32) {
+func (message *Message) readCoord() (float32, error) {
 	message.traceStartMessageReadTrace("readCoord", &message.offset, nil, nil)
 	if message.mvd.demo.fte_pext&FTE_PEXT_FLOATCOORDS == FTE_PEXT_FLOATCOORDS {
-		err, f := message.readFloat()
+		f, err := message.readFloat()
 		if err != nil {
-			return err, 0
+			return 0, err
 		}
 		message.traceStartMessageReadTrace("readCoord", nil, &message.offset, f)
-		return nil, f
+		return f, nil
 	}
-	err, b := message.readShort()
+	b, err := message.readShort()
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	message.traceStartMessageReadTrace("readCoord", nil, &message.offset, float32(b)*(1.0/8))
-	return nil, float32(b) * (1.0 / 8)
+	return float32(b) * (1.0 / 8), nil
 }
 
-func (message *Message) readAngle() (error, float32) {
+func (message *Message) readAngle() (float32, error) {
 	message.traceStartMessageReadTrace("readAngle", &message.offset, nil, nil)
 	if message.mvd.demo.fte_pext&FTE_PEXT_FLOATCOORDS == FTE_PEXT_FLOATCOORDS {
 
-		err, a := message.readAngle16()
+		a, err := message.readAngle16()
 		if err != nil {
-			return err, 0
+			return 0, err
 		}
 		message.traceStartMessageReadTrace("readAngle", nil, &message.offset, a)
-		return nil, a
+		return a, nil
 	}
-	err, b := message.readByte()
+	b, err := message.readByte()
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	message.traceStartMessageReadTrace("readAngle", nil, &message.offset, float32(b)*(360.0/256.0))
-	return nil, float32(b) * (360.0 / 256.0)
+	return float32(b) * (360.0 / 256.0), nil
 }
 
-func (message *Message) readAngle16() (error, float32) {
+func (message *Message) readAngle16() (float32, error) {
 	message.traceStartMessageReadTrace("readAngle16", &message.offset, nil, nil)
-	err, b := message.readShort()
+	b, err := message.readShort()
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	message.traceStartMessageReadTrace("readAngle16", nil, &message.offset, float32(b)*(360.0/65536))
-	return nil, float32(b) * (360.0 / 65536)
+	return float32(b) * (360.0 / 65536), nil
 }
 
-func (message *Message) readShort() (error, int) {
+func (message *Message) readShort() (int, error) {
 	var i int16
 	message.traceStartMessageReadTrace("readShort", &message.offset, nil, nil)
-	err, b := message.readBytes(2)
+	b, err := message.readBytes(2)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	err = binary.Read(b, binary.LittleEndian, &i)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	message.traceStartMessageReadTrace("readShort", nil, &message.offset, int(i))
-	return nil, int(i)
+	return int(i), nil
 }
 
-func (message *Message) peekBytes(count, offset uint) (error, *bytes.Buffer) {
+func (message *Message) peekBytes(count, offset uint) (*bytes.Buffer, error) {
 	offs := new(uint)
 	*offs = message.offset + offset
 	message.traceStartMessageReadTrace("peekBytes", &message.offset, nil, nil)
 	if message.offset+count > message.size {
-		return errors.New("reading beyond message length"), nil
+		return nil, errors.New("reading beyond message length")
 	}
 
 	b := bytes.NewBuffer(message.mvd.file[message.OffsetStart+message.offset : message.OffsetStart+message.offset+count])
 	offs = new(uint)
 	*offs = message.offset + offset + count
 	message.traceStartMessageReadTrace("peekBytes", nil, offs, b)
-	return nil, b
+	return b, nil
 }
 
-func (message *Message) peekByte(offset uint) (error, byte) {
+func (message *Message) peekByte(offset uint) (byte, error) {
 	var b byte
 	offs := new(uint)
 	*offs = message.offset + offset
 	message.traceStartMessageReadTrace("peekByte", offs, nil, nil)
-	err, barray := message.peekBytes(1, offset)
+	barray, err := message.peekBytes(1, offset)
 	if err != nil {
-		return err, byte(0)
+		return byte(0), err
 	}
 	err = binary.Read(barray, binary.BigEndian, &b)
 	if err != nil {
-		return err, byte(0)
+		return byte(0), err
 	}
 	offs = new(uint)
 	*offs = message.offset + offset + 1
 	message.traceStartMessageReadTrace("peekByte", nil, offs, b)
-	return nil, b
+	return b, nil
 }

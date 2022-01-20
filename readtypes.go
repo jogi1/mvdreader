@@ -30,19 +30,19 @@ func (mvd *Mvd) demotime() error {
 	return nil
 }
 
-func (mvd *Mvd) readBytes(count uint) (error, *bytes.Buffer) {
+func (mvd *Mvd) readBytes(count uint) (*bytes.Buffer, error) {
 	if mvd.debug != nil {
 		mvd.debug.Println("------------- READBYTES: ", mvd.getInfo(count), count)
 	}
 	if mvd.file_offset+count > mvd.file_length {
-		return errors.New("readBytes: trying to read beyond"), nil
+		return nil, errors.New("readBytes: trying to read beyond")
 	}
 
 	mvd.traceStartReadTrace("readBytes", &mvd.file_offset, nil, nil)
 	b := bytes.NewBuffer(mvd.file[mvd.file_offset : mvd.file_offset+count])
 	mvd.file_offset += count
 	mvd.traceStartReadTrace("readBytes", nil, &mvd.file_offset, b)
-	return nil, b
+	return b, nil
 }
 
 func (mvd *Mvd) getInfo(a ...interface{}) string {
@@ -71,44 +71,44 @@ func (mvd *Mvd) readByte() (error, byte) {
 	return nil, b
 }
 
-func (mvd *Mvd) readInt() (error, int32) {
+func (mvd *Mvd) readInt() (int32, error) {
 	var i int32
 	mvd.traceStartReadTrace("readInt", &mvd.file_offset, nil, nil)
-	err, b := mvd.readBytes(4)
+	b, err := mvd.readBytes(4)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	err = binary.Read(b, binary.LittleEndian, &i)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	mvd.traceStartReadTrace("readInt", nil, &mvd.file_offset, i)
-	return nil, i
+	return i, nil
 }
 
-func (mvd *Mvd) readUint() (error, uint32) {
+func (mvd *Mvd) readUint() (uint32, error) {
 	var i uint32
 	mvd.traceStartReadTrace("readUint", &mvd.file_offset, nil, nil)
-	err, b := mvd.readBytes(4)
+	b, err := mvd.readBytes(4)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	err = binary.Read(b, binary.LittleEndian, &i)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	mvd.traceStartReadTrace("readUint", nil, &mvd.file_offset, i)
-	return nil, i
+	return i, nil
 }
 
-func (mvd *Mvd) readIt(cmd DEM_TYPE) (error, bool) {
+func (mvd *Mvd) readIt(cmd DEM_TYPE) (bool, error) {
 	mvd.traceStartReadItTrace()
-	err, i := mvd.readUint()
+	i, err := mvd.readUint()
 	if err != nil {
-		return err, false
+		return false, err
 	}
 
 	current_size := int(i)
@@ -118,7 +118,7 @@ func (mvd *Mvd) readIt(cmd DEM_TYPE) (error, bool) {
 		if mvd.debug != nil {
 			mvd.debug.Println("ReadIt: current size 0 go to next Frame! <----------")
 		}
-		return nil, false
+		return false, nil
 	}
 	old_offset := mvd.file_offset
 	mvd.file_offset += uint(current_size)
@@ -132,13 +132,13 @@ func (mvd *Mvd) readIt(cmd DEM_TYPE) (error, bool) {
 		)
 	}
 	if mvd.file_offset > mvd.file_length {
-		return fmt.Errorf("offset (%d) larger than filesize (%d)", mvd.file_offset, mvd.file_length), false
+		return false, fmt.Errorf("offset (%d) larger than filesize (%d)", mvd.file_offset, mvd.file_length)
 	}
 	if mvd.demo.last_type == dem_multiple && mvd.demo.last_to == 0 {
 		if mvd.debug != nil {
 			mvd.debug.Println("ReadIt: we skip this message?")
 		}
-		return err, false
+		return false, err
 	}
 	message := Message{
 		mvd:         mvd,
@@ -146,21 +146,21 @@ func (mvd *Mvd) readIt(cmd DEM_TYPE) (error, bool) {
 		OffsetStart: old_offset,
 		OffsetStop:  mvd.file_offset,
 	}
-	err, fullRead := mvd.messageParse(message)
+	fullRead, err := mvd.messageParse(message)
 	if err != nil {
-		return err, false
-	}
+		return false, err
+    }
 	if fullRead {
-		return nil, false
+		return false, nil
 	}
 	if mvd.demo.last_type == dem_multiple {
 		if mvd.debug != nil {
 			mvd.debug.Println("looping")
 		}
-		return nil, true
+		return true, nil
 	}
 	if mvd.debug != nil {
 		mvd.debug.Println("ReadIt: go to next Frame! <----------")
 	}
-	return nil, false
+	return false, nil
 }
