@@ -42,6 +42,7 @@ func (mvd *Mvd) messageParse(message Message) (error, bool) {
 			return err, false
 		}
 		msg_type := SVC_TYPE(msgt)
+        mvd.State.ProtocolMessage = append(mvd.State.ProtocolMessage, msg_type)
 		mvd.traceMessageInfo(msg_type)
 
 		if mvd.debug != nil {

@@ -95,16 +95,17 @@ type ServerMessage struct {
 }
 
 type State struct {
-	Time         float64
-	Players      [32]Player
-	SoundsActive []Sound
-	SoundsStatic []Sound
-	Serverinfo   []Serverinfo
-	Messages     []ServerMessage
-	Centerprint  []string
-	TempEntities []Tempentity
-	Entities     []Entity
-	StuffText    []string
+    Time         float64
+    Players      [32]Player
+    SoundsActive []Sound
+    SoundsStatic []Sound
+    Serverinfo   []Serverinfo
+    Messages     []ServerMessage
+    Centerprint  []string
+    TempEntities []Tempentity
+    Entities     []Entity
+    StuffText    []string
+    ProtocolMessage []SVC_TYPE
 }
 
 type Entity struct {
@@ -211,6 +212,8 @@ func (mvd *Mvd) ParseFrame() (error, bool) {
 	mvd.State.Serverinfo = nil
 	mvd.State_last_frame.Messages = mvd.State.Messages
 	mvd.State.Messages = nil
+    mvd.State_last_frame.ProtocolMessage = mvd.State.ProtocolMessage
+    mvd.State.ProtocolMessage = nil
 	for i := range mvd.State.Players {
 		mvd.State.Players[i].Setinfo = make(map[string]string)
 		for k, v := range mvd.State_last_frame.Players[i].Setinfo {
@@ -348,6 +351,7 @@ func (mvd *Mvd) readFrame() error {
 			mvd.traceReadFrameStop()
 			continue
 		}
+
 		if msg_type == dem_read {
 			err, b := mvd.readIt(msg_type)
 			if err != nil {
