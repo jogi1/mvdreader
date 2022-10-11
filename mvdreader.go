@@ -18,7 +18,9 @@ type Demo struct {
 }
 
 type Vector struct {
-	X, Y, Z float32
+    X float32 `json:"x"`
+    Y float32 `json:"y"`
+    Z float32 `json:"z"`
 }
 
 func (v *Vector) Set(x, y, z float32) {
@@ -28,51 +30,55 @@ func (v *Vector) Set(x, y, z float32) {
 }
 
 type PE_Info struct {
-	Events PE_TYPE
-	Pnum   byte
+	Events PE_TYPE `json:"events"`
+	Pnum   byte  `json:"player_number"`
 }
 
 type Player struct {
-	EventInfo   PE_Info
-	Name        string
-	Team        string
-	Userid      int
-	Spectator   bool
-	Deaths      int
-	Suicides    int
-	Teamkills   int
-	Origin      Vector
-	Angle       Vector
-	ModelIndex  byte
-	SkinNum     byte
-	WeaponFrame byte
-	Effects     byte
-	Ping        int
-	Pl          byte
-	Entertime   float32
-	Frame       int
+	EventInfo   PE_Info `json:"event_info"`
+	Name        ReaderString `json:"name"`
+	Team        ReaderString `json:"team"`
+	Userid      int `json:"user_id"`
+	Spectator   bool `json:"spectator"`
+	Deaths      int `json:"deaths"`
+	Suicides    int `json:"suicides"`
+	Teamkills   int `json:"teamkills"`
+	Origin      Vector `json:"origin"`
+	Angle       Vector `json:"angle"`
+	ModelIndex  byte `json:"model_index"`
+	SkinNum     byte `json:"skin_number"`
+	WeaponFrame byte `json:"weapon_frame"`
+	Effects     byte `json:"effects"`
+	Ping        int `json:"ping"`
+	Pl          byte `json:"packetloss"`
+	Entertime   float32 `json:"enter_time"`
+	Frame       int `json:"frame"`
 
 	// stat
-	Health       int
-	Frags        int
-	Weapon       int
-	Ammo         int
-	Armor        int
-	Weaponframe  int
-	Shells       int
-	Nails        int
-	Rockets      int
-	Cells        int
-	Activeweapon int
-	Totalsecrets int
-	Totalmonster int
-	Secrets      int
-	Monsters     int
-	Items        int
-	Viewheight   int
-	Time         int
+	Health       int `json:"health"`
+	Frags        int `json:"frags"`
+	Weapon       int `json:"weapon"`
+	Ammo         int `json:"ammo"`
+	Armor        int `json:"armor"`
+	Weaponframe  int `json:"weapon_frame"`
+	Shells       int `json:"shell"`
+	Nails        int `json:"nails"`
+	Rockets      int `json:"rockets"`
+	Cells        int `json:"cells"`
+	Activeweapon int `json:"active_weapon"`
+	Totalsecrets int `json:"total_secrets"`
+	Totalmonster int `json:"total_monsters"`
+	Secrets      int `json:"secrets"`
+	Monsters     int `json:"monsters"`
+	Items        int `json:"items"`
+	Viewheight   int `json:"viewheight"`
+	Time         int `json:"time"`
 
-	Setinfo map[string]string
+	Setinfo map[string]ReaderString `json:"setinfo"`
+}
+
+func (p *Player) HasItem(item IT_TYPE) bool {
+	return p.Items&int(item) == int(item)
 }
 
 type Sound struct {
@@ -85,13 +91,13 @@ type Sound struct {
 }
 
 type Serverinfo struct {
-	Key   string
-	Value string
+	Key   ReaderString
+    Value ReaderString
 }
 
 type ServerMessage struct {
 	From    int
-	Message string
+	Message ReaderString
 }
 
 type State struct {
@@ -101,10 +107,11 @@ type State struct {
 	SoundsStatic []Sound
 	Serverinfo   []Serverinfo
 	Messages     []ServerMessage
-	Centerprint  []string
+	Centerprint  []ReaderString
 	TempEntities []Tempentity
 	Entities     []Entity
-	StuffText    []string
+	StuffText    []ReaderString
+    ProtocolMessage []SVC_TYPE
 }
 
 type Entity struct {
@@ -132,14 +139,14 @@ type Tempentity struct {
 
 type Server struct {
 	ServerCount     int
-	Gamedir         string
+	Gamedir         ReaderString
 	Demotime        float32
-	Mapname         string
-	Hostname        string
+	Mapname         ReaderString 
+	Hostname        ReaderString
 	Movevars        []float32
-	Serverinfo      map[string]string
-	Soundlist       []string
-	Modellist       []string
+	Serverinfo      map[string]ReaderString
+	Soundlist       []ReaderString
+	Modellist       []ReaderString
 	Baseline        []*Entity
 	baselineIndexed map[int]*Entity
 	StaticEntities  []Entity
@@ -149,10 +156,11 @@ type Server struct {
 type Mvd struct {
 	debug *log.Logger
 
+    ascii_table []rune
+
 	file        []byte
 	file_offset uint
 	file_length uint
-	filename    string
 	Frame       uint
 	done        bool
 	trace       traceInfo
@@ -163,16 +171,20 @@ type Mvd struct {
 	State_last_frame State
 }
 
-func Load(input []byte, logger *log.Logger) (Mvd, error) {
+func Load(input []byte, logger *log.Logger, ascii_table *string) (Mvd, error) {
 	var mvd Mvd
 	mvd.debug = logger
 	mvd.file = input
 	mvd.file_length = uint(len(input))
-	mvd.Server.Serverinfo = make(map[string]string)
+	mvd.Server.Serverinfo = make(map[string]ReaderString)
 	mvd.Server.baselineIndexed = make(map[int]*Entity)
 	// FIXME - this is garbage we need to fix this in some other way
-	mvd.Server.Modellist = append(mvd.Server.Modellist, "")
+    var ml []ReaderString
+	mvd.Server.Modellist = ml
+    var sl []ReaderString
+	mvd.Server.Soundlist = sl
 	mvd.trace.enabled = false
+    mvd.ascii_table = AsciiTableInit(ascii_table)
 	return mvd, nil
 }
 
@@ -211,8 +223,11 @@ func (mvd *Mvd) ParseFrame() ( bool, error) {
 	mvd.State.Serverinfo = nil
 	mvd.State_last_frame.Messages = mvd.State.Messages
 	mvd.State.Messages = nil
+	mvd.State_last_frame.ProtocolMessage = mvd.State.ProtocolMessage
+	mvd.State.ProtocolMessage = nil
+    mvd.State.StuffText = nil
 	for i := range mvd.State.Players {
-		mvd.State.Players[i].Setinfo = make(map[string]string)
+		mvd.State.Players[i].Setinfo = make(map[string]ReaderString)
 		for k, v := range mvd.State_last_frame.Players[i].Setinfo {
 			mvd.State.Players[i].Setinfo[k] = v
 		}

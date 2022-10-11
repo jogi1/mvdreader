@@ -42,8 +42,8 @@ func (mvd *Mvd) messageParse(message Message) (bool, error) {
 			return false, err
 		}
 		msg_type := SVC_TYPE(msgt)
-        fmt.Println(msg_type)
 		mvd.traceMessageInfo(msg_type)
+        mvd.State.ProtocolMessage = append(mvd.State.ProtocolMessage, msg_type)
 
 		if mvd.debug != nil {
 			mvd.debug.Println("handling: ", msg_type)
@@ -127,7 +127,7 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 	if err != nil {
 		return err
 	}
-	mvd.Server.Gamedir = gamedir
+	mvd.Server.Gamedir = *gamedir
 
 	message.traceAddMessageReadTrace("demotime")
 	demotime, err := message.readFloat() // demotime
@@ -142,7 +142,7 @@ func (message *Message) Svc_serverdata(mvd *Mvd) error {
 	if err != nil {
 		return err
 	}
-	mvd.Server.Mapname = s
+	mvd.Server.Mapname = *s
 	for i := 0; i < 10; i++ {
 
 		message.traceAddMessageReadTrace(fmt.Sprintf("movevar_%d", i))
@@ -177,15 +177,15 @@ func (message *Message) Svc_stufftext(mvd *Mvd) error {
 		return err
 	}
 
-	message.mvd.State.StuffText = append(message.mvd.State.StuffText, s)
+	message.mvd.State.StuffText = append(message.mvd.State.StuffText, *s)
 
-	if strings.HasPrefix(s, "fullserverinfo") {
-		trim := s[len("fullserverinfo \"\\"):]
+	if strings.HasPrefix(s.String, "fullserverinfo") {
+		trim := s.String[len("fullserverinfo \"\\"):]
 		trim = strings.TrimRight(trim, "\\\"")
 		splits := strings.Split(trim, "\\")
 
 		for i := 0; i < len(splits); i += 2 {
-			message.mvd.Server.Serverinfo[splits[i]] = splits[i+1]
+			message.mvd.Server.Serverinfo[splits[i]] = *ReaderStringNew([]byte(splits[i+1]), message.mvd.ascii_table)
 		}
 	}
 	return nil
@@ -203,10 +203,13 @@ func (message *Message) Svc_soundlist(mvd *Mvd) error {
 		if err != nil {
 			return err
 		}
-		if len(s) == 0 {
+		if s == nil {
 			break
 		}
-		message.mvd.Server.Soundlist = append(message.mvd.Server.Soundlist, s)
+        if len(s.String) == 0 {
+			break
+        }
+		message.mvd.Server.Soundlist = append(message.mvd.Server.Soundlist, *s)
 	}
 
 	message.traceAddMessageReadTrace("offset")
@@ -230,10 +233,13 @@ func (message *Message) Svc_modellist(mvd *Mvd) error {
 		if err != nil {
 			return err
 		}
-		if len(s) == 0 {
+		if s == nil {
 			break
 		}
-		message.mvd.Server.Modellist = append(message.mvd.Server.Modellist, s)
+        if len(s.String) == 0 {
+			break
+        }
+		message.mvd.Server.Modellist = append(message.mvd.Server.Modellist, *s)
 	}
 	message.traceAddMessageReadTrace("offset")
 	_, err = message.readByte() // some more indexes
@@ -494,31 +500,31 @@ func (message *Message) Svc_updateuserinfo(mvd *Mvd) error {
 	p.Userid = uid
 
 	message.traceAddMessageReadTrace("userinfo")
-	ui, err := message.readString()
+	ui_rs, err := message.readString()
 	if err != nil {
 		return err
 	}
-	if len(ui) < 2 {
+	if len(ui_rs.String) < 2 {
 		return nil
 	}
-	ui = ui[1:]
+    ui := ui_rs.String[1:]
 	splits := strings.Split(ui, "\\")
 
 	p.Spectator = false
-	p.Setinfo["*spectator"] = "0"
+	p.Setinfo["*spectator"] = *ReaderStringNew([]byte("0"), message.mvd.ascii_table)
 	for i := 0; i < len(splits); i += 2 {
 		v := splits[i+1]
 		switch splits[i] {
 		case "name":
-			p.Name = v
+			p.Name = *ReaderStringNew([]byte(v), message.mvd.ascii_table)
 		case "team":
-			p.Team = v
+			p.Team = *ReaderStringNew([]byte(v), message.mvd.ascii_table)
 		case "*spectator":
 			if v == "1" {
 				p.Spectator = true
 			}
 		}
-		p.Setinfo[splits[i]] = v
+		p.Setinfo[splits[i]] = *ReaderStringNew([]byte(v), message.mvd.ascii_table)
 	}
 	mvd.emitEventPlayer(p, pnum, PE_USERINFO)
 	return nil
@@ -1143,7 +1149,7 @@ func (message *Message) Svc_print(mvd *Mvd) error {
 	if err != nil {
 		return err
 	}
-	mvd.State.Messages = append(mvd.State.Messages, ServerMessage{int(from), s})
+	mvd.State.Messages = append(mvd.State.Messages, ServerMessage{int(from), *s})
 	return nil
 }
 
@@ -1158,11 +1164,11 @@ func (message *Message) Svc_serverinfo(mvd *Mvd) error {
 	if err != nil {
 		return err
 	}
-	if key == "hostname" {
-		mvd.Server.Hostname = value
+	if key.String == "hostname" {
+		mvd.Server.Hostname = *value
 	}
-	mvd.State.Serverinfo = append(mvd.State.Serverinfo, Serverinfo{key, value})
-	mvd.Server.Serverinfo[key] = value
+	mvd.State.Serverinfo = append(mvd.State.Serverinfo, Serverinfo{*key, *value})
+	mvd.Server.Serverinfo[key.String] = *value
 	return nil
 }
 
@@ -1175,7 +1181,7 @@ func (message *Message) Svc_centerprint(mvd *Mvd) error {
 	if err != nil {
 		return err
 	}
-	mvd.State.Centerprint = append(mvd.State.Centerprint, s)
+	mvd.State.Centerprint = append(mvd.State.Centerprint, *s)
 	return nil
 }
 
@@ -1196,7 +1202,7 @@ func (message *Message) Svc_setinfo(mvd *Mvd) error {
 	if err != nil {
 		return err
 	}
-	mvd.State.Players[pnum].Setinfo[key] = value
+	mvd.State.Players[pnum].Setinfo[key.String] = *value
 	mvd.emitEventPlayer(&mvd.State.Players[int(pnum)], pnum, PE_USERINFO)
 	return nil
 }
@@ -1389,10 +1395,10 @@ func (message *Message) Svc_fte_modellistshort(mvd *Mvd) error {
 		if err != nil {
 			return err
 		}
-		if len(s) == 0 {
+		if len(s.String) == 0 {
 			break
 		}
-		message.mvd.Server.Modellist = append(message.mvd.Server.Modellist, s)
+		message.mvd.Server.Modellist = append(message.mvd.Server.Modellist, *s)
 	}
 	message.traceAddMessageReadTrace("offset")
 	_, err = message.readByte() // some more indexes
@@ -1606,13 +1612,13 @@ func (message *Message) readFloat() (float32, error) {
 	return float32(i), nil
 }
 
-func (message *Message) readString() (string, error) {
+func (message *Message) readString() (*ReaderString, error) {
 	b := make([]byte, 0)
 	message.traceStartMessageReadTrace("readString", &message.offset, nil, nil)
 	for {
 		c, err := message.readByte()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if c == 255 {
 			continue
@@ -1624,7 +1630,7 @@ func (message *Message) readString() (string, error) {
 	}
 
 	message.traceStartMessageReadTrace("readString", nil, &message.offset, string(b))
-	return string(b), nil
+    return ReaderStringNew(b, message.mvd.ascii_table), nil
 }
 
 func (message *Message) readCoord() (float32, error) {
